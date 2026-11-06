@@ -24,7 +24,7 @@
 
 // ---- Call handling ----
 #define AUTO_ANSWER_MS     1000             // -1 = answer manually only
-#define ANSWER_BUTTON_PIN  0                // BOOT: tap = answer/hang up, hold 3 s = setup
+#define ANSWER_BUTTON_PIN  0                // BOOT: press = answer / hang up
 
 // ---- Audio hardware (build-time only; same wiring as ESP32S3_AudioWebTest) ----
 #define I2S_BCLK_PIN       4                // INMP441 SCK + MAX98357A BCLK

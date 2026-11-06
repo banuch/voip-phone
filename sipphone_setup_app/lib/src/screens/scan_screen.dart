@@ -164,14 +164,14 @@ class _ScanScreenState extends State<ScanScreen> {
           ? const EmptyState(
               icon: Icons.bluetooth_searching,
               title: 'Looking for phones...',
-              body: 'Phones in setup mode show up here as SipPhone-XXXX.',
+              body: 'Powered phones show up here as SipPhone-XXXX.',
               loading: true,
             )
           : EmptyState(
               icon: Icons.phonelink_ring_outlined,
               title: 'No phones found',
-              body: 'Put the phone in setup mode: it starts by itself when unconfigured, '
-                  'or hold the BOOT button for 3 seconds. Then scan again.',
+              body: 'Make sure the phone is powered and within a few metres, then scan again. '
+                  'If it is still missing, check its serial log for "[BLE] advertising".',
               action: FilledButton.icon(
                 onPressed: _adapterOn ? _scan : null,
                 icon: const Icon(Icons.refresh),

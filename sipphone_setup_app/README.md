@@ -4,11 +4,11 @@ Android / iOS app that configures the `ESP32S3_SipPhone` over Bluetooth LE. It s
 
 ## Features
 
-- Scans only for phones in setup mode (`SipPhone-XXXX`, service `6b3f0001-…`) and shows signal strength
+- Scans only for SIP phones (`SipPhone-XXXX`, service `6b3f0001-…`) and shows signal strength
 - Live Wi-Fi / IP / SIP / call status from the Status notifications
 - Wi-Fi, SIP account, auto-answer, volume and mic gain sliders, advanced ports, with the same validation as the firmware
 - Passwords are write-only: leave a field empty to keep the stored one
-- Save, restart, turn off Bluetooth, factory reset; reconnects automatically after the phone restarts
+- Save, restart, factory reset; reconnects automatically after the phone restarts
 - Responsive: single column on phones, wider column on tablets, side status panel + form on large screens; light and dark themes
 
 ## Run
@@ -18,7 +18,7 @@ flutter pub get
 flutter run
 ```
 
-Put the phone in setup mode first (automatic when unconfigured, or hold BOOT for 3 s). Android asks for the Nearby devices permission on first scan; accept the pairing prompt when connecting.
+The phone advertises over Bluetooth whenever it is powered. Android asks for the Nearby devices permission on first scan; accept the pairing prompt when connecting.
 
 ## Layout
 

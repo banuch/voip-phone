@@ -17,7 +17,7 @@ class SessionMessage {
   final Tone tone;
 }
 
-/// One GATT connection to a phone in setup mode.
+/// One GATT connection to a SIP phone.
 class PhoneSession extends ChangeNotifier {
   PhoneSession(this.device);
 
@@ -89,7 +89,7 @@ class PhoneSession extends ChangeNotifier {
     final services = await device.discoverServices();
     final svc = services.firstWhere(
       (s) => s.uuid == serviceUuid,
-      orElse: () => throw StateError('This device is not a SIP phone in setup mode'),
+      orElse: () => throw StateError('This device is not a SIP phone'),
     );
     BluetoothCharacteristic find(Guid id) => svc.characteristics.firstWhere((c) => c.uuid == id);
     _config = find(configUuid);
@@ -143,8 +143,6 @@ class PhoneSession extends ChangeNotifier {
         case 'rebooting':
           _savedPending = true;
           _say('The phone is restarting...', Tone.info);
-        case 'exiting':
-          _say('Bluetooth turned off on the phone.', Tone.info);
         default:
           _notify();
       }
@@ -166,7 +164,7 @@ class PhoneSession extends ChangeNotifier {
     }
   }
 
-  /// After save / reboot / reset the phone restarts back into setup mode once.
+  /// After save / reboot / reset the phone restarts and advertises again.
   Future<void> _reconnectAfterRestart() async {
     state = SessionState.restarting;
     _notify();
@@ -184,7 +182,7 @@ class PhoneSession extends ChangeNotifier {
     }
     _savedPending = false;
     state = SessionState.disconnected;
-    if (!_userDisconnect) _say('The phone did not come back. Put it in setup mode and connect again.', Tone.warning);
+    if (!_userDisconnect) _say('The phone did not come back. Check its power and connect again.', Tone.warning);
   }
 
   Future<void> _write(BluetoothCharacteristic c, List<int> bytes) => c.write(bytes, withoutResponse: false);
@@ -207,10 +205,6 @@ class PhoneSession extends ChangeNotifier {
 
   Future<void> reboot() => _guard('Restart', () => _send('reboot'));
   Future<void> factoryReset() => _guard('Factory reset', () => _send('factory_reset'));
-  Future<void> turnOffBluetooth() => _guard('Turn off', () async {
-        _userDisconnect = true;
-        await _send('exit');
-      });
 
   Future<void> _guard(String what, Future<void> Function() action) async {
     if (!isReady || busy) return;

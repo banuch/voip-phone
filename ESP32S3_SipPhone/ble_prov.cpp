@@ -5,7 +5,6 @@
 #include <BLEServer.h>
 #include <BLESecurity.h>
 #include <WiFi.h>
-#include <esp_attr.h>
 
 namespace {
 
@@ -14,16 +13,13 @@ const char *CONFIG_UUID = "6b3f0002-7c1a-4d2e-9b8f-2a1c5e7d9f01";
 const char *COMMAND_UUID = "6b3f0003-7c1a-4d2e-9b8f-2a1c5e7d9f01";
 const char *STATUS_UUID = "6b3f0004-7c1a-4d2e-9b8f-2a1c5e7d9f01";
 
-constexpr uint32_t IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 constexpr size_t MAX_JSON = 2048;
-constexpr uint32_t SETUP_MAGIC = 0x5E7A5E7A;
-
-// Survives ESP.restart(): reboot straight back into setup mode after a save.
-RTC_NOINIT_ATTR uint32_t setupAfterBoot;
+// Advertising interval in 0.625 ms units (500 ms - 1 s). Slow enough to leave
+// the shared 2.4 GHz radio to Wi-Fi/RTP, fast enough to be found in a scan.
+constexpr uint16_t ADV_MIN = 800, ADV_MAX = 1600;
 
 bool isActive = false;
 volatile bool connected = false;
-volatile uint32_t lastActivity = 0;
 BLEServer *server = nullptr;
 BLECharacteristic *configChr = nullptr, *statusChr = nullptr;
 
@@ -33,7 +29,7 @@ String rxJson, pendingCmd;
 bool rxOverflow = false;
 
 String lastStatus, lastConfig, result = "ready", resultDetail;
-uint32_t statusAt = 0, rebootAt = 0, stopAt = 0;
+uint32_t statusAt = 0, rebootAt = 0;
 
 String deviceName() {
   uint64_t mac = ESP.getEfuseMac();
@@ -45,12 +41,10 @@ String deviceName() {
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *) override {
     connected = true;
-    lastActivity = millis();
   }
   void onDisconnect(BLEServer *) override {
     connected = false;
-    lastActivity = millis();
-    if (isActive) BLEDevice::startAdvertising();
+    BLEDevice::startAdvertising();  // always connectable
   }
 };
 
@@ -61,7 +55,6 @@ class ConfigCallbacks : public BLECharacteristicCallbacks {
     if (rxJson.length() + chunk.length() > MAX_JSON) rxOverflow = true;
     else rxJson += chunk;
     xSemaphoreGive(mutex);
-    lastActivity = millis();
   }
 };
 
@@ -77,7 +70,6 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       pendingCmd = cmd;
     }
     xSemaphoreGive(mutex);
-    lastActivity = millis();
   }
 };
 
@@ -130,21 +122,15 @@ void handleCommand(const String &cmd) {
     else if (!settings::save(next, err)) setResult("error", err);
     else {
       setResult("saved", "restarting to apply");
-      setupAfterBoot = SETUP_MAGIC;
       rebootAt = millis() + 1500;
     }
   } else if (cmd == "reboot") {
     setResult("rebooting", "");
-    setupAfterBoot = SETUP_MAGIC;
     rebootAt = millis() + 1000;
   } else if (cmd == "factory_reset") {
     settings::factoryReset();
     setResult("reset", "settings erased, restarting");
-    setupAfterBoot = SETUP_MAGIC;
     rebootAt = millis() + 1500;
-  } else if (cmd == "exit") {
-    setResult("exiting", "Bluetooth off");
-    stopAt = millis() + 500;
   } else if (cmd.length()) {
     setResult("error", "unknown command " + cmd);
   }
@@ -154,17 +140,11 @@ void handleCommand(const String &cmd) {
 
 namespace ble_prov {
 
-void begin() {
-  mutex = xSemaphoreCreateMutex();
-  bool after = setupAfterBoot == SETUP_MAGIC;
-  setupAfterBoot = 0;
-  if (after || !settings::configured()) start();
-}
-
 bool active() { return isActive; }
 
-void start() {
+void begin() {
   if (isActive) return;
+  mutex = xSemaphoreCreateMutex();
   String name = deviceName();
   BLEDevice::init(name);
   BLEDevice::setMTU(247);
@@ -192,22 +172,13 @@ void start() {
   BLEAdvertising *adv = BLEDevice::getAdvertising();
   adv->addServiceUUID(SERVICE_UUID);
   adv->setScanResponse(true);
+  adv->setMinInterval(ADV_MIN);
+  adv->setMaxInterval(ADV_MAX);
   BLEDevice::startAdvertising();
   isActive = true;
-  lastActivity = millis();
   result = "ready";
   resultDetail = "";
-  Serial.printf("[BLE] setup mode ON: connect to \"%s\" with the setup page\n", name.c_str());
-}
-
-void stop() {
-  if (!isActive) return;
-  isActive = false;
-  connected = false;
-  BLEDevice::deinit(false);
-  server = nullptr;
-  configChr = statusChr = nullptr;
-  Serial.println("[BLE] setup mode OFF");
+  Serial.printf("[BLE] advertising as \"%s\": connect with the setup app or page\n", name.c_str());
 }
 
 void loop() {
@@ -217,11 +188,6 @@ void loop() {
     ESP.restart();
   }
   if (!isActive) return;
-  if (stopAt && int32_t(millis() - stopAt) >= 0) {
-    stopAt = 0;
-    stop();
-    return;
-  }
 
   String cmd;
   xSemaphoreTake(mutex, portMAX_DELAY);
@@ -243,12 +209,6 @@ void loop() {
       lastConfig = c;
       configChr->setValue(c);
     }
-  }
-
-  // Stay on while unconfigured; otherwise switch off after 10 idle minutes.
-  if (settings::configured() && !connected && !rebootAt && millis() - lastActivity > IDLE_TIMEOUT_MS) {
-    Serial.println("[BLE] idle timeout");
-    stop();
   }
 }
 

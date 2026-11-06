@@ -38,7 +38,7 @@ button:disabled{opacity:.45;cursor:default}
 <body>
 <main>
 <h1>SIP Phone Setup</h1>
-<p class="lead">Configure the ESP32-S3 SIP phone over Bluetooth. Put the phone in setup mode first: it starts by itself when unconfigured, or hold BOOT for 3 seconds.</p>
+<p class="lead">Configure the ESP32-S3 SIP phone over Bluetooth. The phone is always connectable while powered.</p>
 
 <section>
   <div class="row">
@@ -105,7 +105,6 @@ button:disabled{opacity:.45;cursor:default}
   <div class="row">
     <button type="submit" id="save" disabled>Save and restart</button>
     <button type="button" id="reload" class="secondary" disabled>Reload from device</button>
-    <button type="button" id="exit" class="secondary" disabled>Turn off Bluetooth</button>
     <button type="button" id="reset" class="danger" disabled>Factory reset</button>
   </div>
   <p><small>Leave a password field empty to keep the saved password. Passwords are never read back from the device.</small></p>
@@ -127,7 +126,7 @@ let device = null, chr = {}, reconnecting = false, savedPending = false;
 
 function say(text, cls = '') { const m = $('message'); m.textContent = text; m.className = cls; }
 function setConnected(on) {
-  for (const id of ['save','reload','exit','reset']) $(id).disabled = !on;
+  for (const id of ['save','reload','reset']) $(id).disabled = !on;
   $('disconnect').disabled = !on;
   $('connect').disabled = on;
 }
@@ -152,7 +151,6 @@ function showStatus(s) {
   if (s.result === 'error') say('Device rejected the settings: ' + s.detail, 'bad');
   else if (s.result === 'saved') { savedPending = true; say('Saved. The phone is restarting to apply them, and this page will reconnect...', 'good'); }
   else if (s.result === 'reset') say('Settings erased. The phone is restarting...', 'warn');
-  else if (s.result === 'exiting') say('Bluetooth turned off on the phone.', '');
 }
 
 async function readJson(c) { return JSON.parse(dec.decode(await c.readValue())); }
@@ -203,7 +201,7 @@ async function onDisconnected() {
   $('device').textContent = '';
   if (!savedPending || reconnecting) return;
   reconnecting = true;
-  // After a save the phone reboots back into setup mode; try to reattach.
+  // After a save the phone reboots and advertises again; try to reattach.
   for (let attempt = 1; attempt <= 15; attempt++) {
     await new Promise(r => setTimeout(r, 2000));
     try {
@@ -251,7 +249,6 @@ async function save(ev) {
 $('connect').onclick = connect;
 $('disconnect').onclick = () => { savedPending = false; device?.gatt.disconnect(); };
 $('reload').onclick = async () => { try { fill(await readJson(chr.config)); say('Reloaded from device.'); } catch (e) { say(e.message, 'bad'); } };
-$('exit').onclick = async () => { try { await command('exit'); } catch (e) { say(e.message, 'bad'); } };
 $('reset').onclick = async () => {
   if (!confirm('Erase all saved settings on the phone?')) return;
   try { await command('factory_reset'); } catch (e) { say(e.message, 'bad'); }

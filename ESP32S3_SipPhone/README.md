@@ -1,6 +1,6 @@
 # ESP32-S3 SIP phone
 
-Registers to a SIP server (tested target: Asterisk on the same LAN) and answers incoming calls with two-way G.711 audio through the INMP441 microphone and MAX98357A speaker. All Wi-Fi, SIP and audio settings are set over **Bluetooth LE** from a browser page and stored in flash. Arduino-ESP32 **3.3.12**, no external libraries, no PSRAM required.
+Registers to a SIP server (tested target: Asterisk on the same LAN) and answers incoming calls with two-way G.711 audio through the INMP441 microphone and MAX98357A speaker. All Wi-Fi, SIP and audio settings are set over **Bluetooth LE** from the Flutter app (`sipphone_setup_app`) or a browser page and stored in flash. Bluetooth is always on, so settings can be changed at any time. Arduino-ESP32 **3.3.12**, no external libraries, no PSRAM required.
 
 Wiring is identical to `ESP32S3_AudioWebTest` (GPIO4 BCLK, GPIO5 WS, GPIO6 mic SD, GPIO7 amp DIN). Verify the mic and speaker with that bench sketch first.
 
@@ -17,12 +17,11 @@ $env:AUDIO_SKETCH='ESP32S3_SipPhone'
 
 ## Set it up over Bluetooth
 
-1. Power the phone. With no saved settings it starts **setup mode** by itself and the Serial Monitor shows `[BLE] setup mode ON: connect to "SipPhone-XXXX"`. Otherwise, hold **BOOT for 3 seconds** after it has booted (holding BOOT during power-on enters the flasher instead), or send `b` on Serial.
+1. Power the phone. It always advertises over Bluetooth, and the Serial Monitor shows `[BLE] advertising as "SipPhone-XXXX"`.
 2. Open [`provision.html`](provision.html) in **Chrome or Edge** on Android, Windows, macOS or Linux. Double-click the file, or serve the folder with `python -m http.server` and open `http://localhost:8000/provision.html`. On iPhone use the Bluefy browser.
 3. Click **Connect**, pick `SipPhone-XXXX`, and accept the pairing prompt if your system shows one.
 4. Fill in Wi-Fi, SIP server, extension and password, then click **Save and restart**.
-5. The phone validates and stores the settings, restarts, and comes back in setup mode once so the page can reconnect. Check that the status shows Wi-Fi *connected* and SIP *registered*.
-6. Bluetooth switches off after 10 idle minutes, or immediately with **Turn off Bluetooth**. It stays on while the phone is unconfigured.
+5. The phone validates and stores the settings and restarts; the page or app reconnects when it is back. Check that the status shows Wi-Fi *connected* and SIP *registered*.
 
 | Setting | Meaning |
 | --- | --- |
@@ -43,10 +42,10 @@ The service is `6b3f0001-7c1a-4d2e-9b8f-2a1c5e7d9f01`:
 | Characteristic | UUID suffix | Access | Content |
 | --- | --- | --- | --- |
 | Config | `…0002` | read / write, encrypted | Settings JSON, keys as in the table above (`wifi_ssid`, `sip_password`, …) |
-| Command | `…0003` | write, encrypted | `begin`, `save`, `reboot`, `exit`, `factory_reset` |
+| Command | `…0003` | write, encrypted | `begin`, `save`, `reboot`, `factory_reset` |
 | Status | `…0004` | read / notify | Wi-Fi, IP, SIP registration, call state, last result |
 
-To write settings with a generic BLE app such as nRF Connect: write `begin` to Command, then write the JSON to Config in one or more chunks (they are appended), then write `save`. Keys you leave out keep their current values. Pairing is "Just Works" with LE Secure Connections, so the link is encrypted but there is no PIN. Physical access to the BOOT button is what protects setup mode.
+To write settings with a generic BLE app such as nRF Connect: write `begin` to Command, then write the JSON to Config in one or more chunks (they are appended), then write `save`. Keys you leave out keep their current values. Pairing is "Just Works" with LE Secure Connections, so the link is encrypted but there is no PIN. Because Bluetooth is always on, **anyone within Bluetooth range can connect and change the settings** (they can't read the saved passwords). Use this only where that's acceptable.
 
 ### Defaults in firmware (optional)
 
@@ -82,14 +81,12 @@ qualify_frequency=30
 
 | Input | Action |
 | --- | --- |
-| BOOT short press | Answer when ringing, otherwise hang up |
-| BOOT hold 3 s | Bluetooth setup mode |
+| BOOT press | Answer when ringing, otherwise hang up |
 | `a` / `h` | Answer / hang up or decline |
-| `s` | Status: registration, call state, RTP counters, mic peak, setup mode |
+| `s` | Status: registration, call state, RTP counters, mic peak, Bluetooth |
 | `r` | Re-register now |
 | `+` / `-` | Speaker volume ±10% (saved) |
 | `]` / `[` | Mic gain ±1 (saved) |
-| `b` | Bluetooth setup mode |
 | `X` | Factory reset |
 
 ## How it works
@@ -104,14 +101,14 @@ qualify_frequency=30
 - UDP only, no NAT/STUN: the ESP32 and the SIP server must reach each other directly (same LAN).
 - No TLS/SRTP, DTMF, outgoing calls, or echo cancellation. Keep the speaker volume low.
 - Pin numbers are build-time only (`config.h`), not settable over Bluetooth.
-- Bluetooth shares the 2.4 GHz radio with Wi-Fi. Audio may stutter if a call happens while setup mode is on.
+- Bluetooth shares the 2.4 GHz radio with Wi-Fi and stays on during calls. It advertises only every 0.5-1 s to leave airtime for RTP, but avoid keeping the app connected during a call.
 
 ## Troubleshooting
 
 - **Page shows "no Web Bluetooth"**: use Chrome or Edge. Firefox and Safari don't support it.
-- **Phone not in the device list**: it isn't in setup mode. Hold BOOT 3 s, or check Serial for `[BLE] setup mode ON`.
+- **Phone not in the device list**: check Serial for `[BLE] advertising`, move closer, and make sure no other device is still connected to it.
 - **Pairing fails after a factory reset or reflash**: remove `SipPhone-XXXX` from your computer or phone's Bluetooth devices and connect again.
 - **`registration failed: no response`**: wrong SIP server or port, or a firewall on the server.
 - **`401 Unauthorized` repeatedly**: wrong SIP password or auth user.
 - **Connected but silent one way**: run `s` during the call. `rx=0` means no RTP is arriving (set `direct_media=no` and `rtp_symmetric=yes`, check the firewall on the RTP port).
-- **Choppy audio**: check `underruns` and `lost` and the Wi-Fi RSSI; make sure setup mode is off.
+- **Choppy audio**: check `underruns` and `lost` and the Wi-Fi RSSI; disconnect the setup app or page.

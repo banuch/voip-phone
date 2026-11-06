@@ -147,14 +147,7 @@ class _SetupScreenState extends State<SetupScreen> {
       case 'reload':
         s.reload();
       case 'reboot':
-        _confirm(title: 'Restart phone?', body: 'The phone restarts and comes back in setup mode.', action: 'Restart', run: s.reboot);
-      case 'exit':
-        _confirm(
-          title: 'Turn off Bluetooth?',
-          body: 'The phone leaves setup mode. Hold BOOT for 3 seconds to enter it again.',
-          action: 'Turn off',
-          run: s.turnOffBluetooth,
-        );
+        _confirm(title: 'Restart phone?', body: 'The phone restarts and reconnects in a few seconds.', action: 'Restart', run: s.reboot);
       case 'reset':
         _confirm(
           title: 'Factory reset?',
@@ -267,7 +260,6 @@ class _SetupScreenState extends State<SetupScreen> {
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'reload', child: ListTile(leading: Icon(Icons.sync), title: Text('Reload from phone'))),
                 PopupMenuItem(value: 'reboot', child: ListTile(leading: Icon(Icons.restart_alt), title: Text('Restart phone'))),
-                PopupMenuItem(value: 'exit', child: ListTile(leading: Icon(Icons.bluetooth_disabled), title: Text('Turn off Bluetooth'))),
                 PopupMenuDivider(),
                 PopupMenuItem(value: 'reset', child: ListTile(leading: Icon(Icons.delete_forever_outlined), title: Text('Factory reset'))),
               ],
@@ -320,9 +312,6 @@ class _SetupScreenState extends State<SetupScreen> {
             OutlinedButton.icon(onPressed: editable ? () => _menu('reload') : null, icon: const Icon(Icons.sync), label: const Text('Reload from phone')),
             const SizedBox(height: 10),
             OutlinedButton.icon(onPressed: editable ? () => _menu('reboot') : null, icon: const Icon(Icons.restart_alt), label: const Text('Restart phone')),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-                onPressed: editable ? () => _menu('exit') : null, icon: const Icon(Icons.bluetooth_disabled), label: const Text('Turn off Bluetooth')),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: editable ? () => _menu('reset') : null,

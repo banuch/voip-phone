@@ -2,14 +2,14 @@
 // incoming calls with two-way G.711 audio over INMP441 mic + MAX98357A speaker.
 // Arduino-ESP32 3.3.12, no external libraries.
 //
-// Settings are provisioned over Bluetooth LE (see provision.html) and stored
-// in flash. Setup mode starts automatically when unconfigured, or hold BOOT
-// for 3 seconds. config.h only supplies first-boot defaults and pin numbers.
+// Settings are provisioned over Bluetooth LE (the Flutter app or provision.html)
+// and stored in flash. Bluetooth is always on, so the phone can be configured
+// at any time. config.h only supplies first-boot defaults and pin numbers.
 //
-// BOOT button: short press = answer / hang up, hold 3 s = Bluetooth setup mode.
+// BOOT button: press = answer when ringing, otherwise hang up.
 // Serial commands (115200 baud):
 //   a = answer   h = hang up / decline   s = status   r = re-register
-//   + / - = speaker volume   ] / [ = mic gain   b = Bluetooth setup mode
+//   + / - = speaker volume   ] / [ = mic gain
 //   X = factory reset (erase saved settings)   ? = help
 #include <Arduino.h>
 #include <WiFi.h>
@@ -19,11 +19,9 @@
 #include "sip.h"
 #include "ble_prov.h"
 
-constexpr uint32_t LONG_PRESS_MS = 3000;
-
 void help() {
-  Serial.println("Commands: a=answer h=hang up s=status r=re-register +/-=volume ]/[=mic gain b=BLE setup X=factory reset ?=help");
-  Serial.println("BOOT: short press = answer/hang up, hold 3 s = Bluetooth setup mode");
+  Serial.println("Commands: a=answer h=hang up s=status r=re-register +/-=volume ]/[=mic gain X=factory reset ?=help");
+  Serial.println("BOOT: press = answer/hang up");
 }
 
 void saveLevels() { settings::saveAudio(audio::volume(), audio::micGain()); }
@@ -35,7 +33,7 @@ void handleSerial() {
       case 'h': sip::hangup(); break;
       case 's':
         sip::printStatus();
-        Serial.printf("[STATUS] Bluetooth setup %s, settings %s\n", ble_prov::active() ? "ON" : "off",
+        Serial.printf("[STATUS] Bluetooth %s, settings %s\n", ble_prov::active() ? "on" : "FAILED",
                       settings::configured() ? "configured" : "NOT configured");
         break;
       case 'r': sip::reRegister(); break;
@@ -43,7 +41,6 @@ void handleSerial() {
       case '-': audio::setVolume(audio::volume() - 10); saveLevels(); Serial.printf("Volume %d%%\n", audio::volume()); break;
       case ']': audio::setMicGain(audio::micGain() + 1); saveLevels(); Serial.printf("Mic gain %d\n", audio::micGain()); break;
       case '[': audio::setMicGain(audio::micGain() - 1); saveLevels(); Serial.printf("Mic gain %d\n", audio::micGain()); break;
-      case 'b': ble_prov::start(); break;
       case 'X':
         Serial.println("Erasing saved settings and restarting...");
         settings::factoryReset();
@@ -56,24 +53,17 @@ void handleSerial() {
   }
 }
 
-// Short press acts on release; a 3 s hold enters setup mode while still held.
+// Acts on release, after a debounced press of at least 50 ms.
 void handleButton() {
-  static bool lastLevel = HIGH, longDone = false;
+  static bool lastLevel = HIGH;
   static uint32_t changedAt = 0;
   bool level = digitalRead(ANSWER_BUTTON_PIN);
   uint32_t now = millis();
-  if (level != lastLevel) {
-    if (now - changedAt < 30) return;  // debounce
-    if (level == HIGH && !longDone && now - changedAt >= 50) sip::button();
-    lastLevel = level;
-    changedAt = now;
-    longDone = false;
-    return;
-  }
-  if (level == LOW && !longDone && now - changedAt >= LONG_PRESS_MS) {
-    longDone = true;
-    ble_prov::start();
-  }
+  if (level == lastLevel) return;
+  if (now - changedAt < 30) return;  // debounce
+  if (level == HIGH && now - changedAt >= 50) sip::button();
+  lastLevel = level;
+  changedAt = now;
 }
 
 void reportWifi() {
@@ -104,7 +94,7 @@ void setup() {
     WiFi.begin(c.wifiSsid.c_str(), c.wifiPassword.c_str());
     Serial.printf("[WIFI] joining %s...\n", c.wifiSsid.c_str());
   } else {
-    Serial.println("Not configured: use the Bluetooth setup page (provision.html)");
+    Serial.println("Not configured: connect over Bluetooth with the setup app or provision.html");
   }
   ble_prov::begin();
   help();
