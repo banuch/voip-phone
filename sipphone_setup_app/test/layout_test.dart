@@ -28,6 +28,15 @@ void main() {
         await t.pumpAndSettle();
         expect(find.text('Wi-Fi'), findsWidgets);
         expect(find.text('Save and restart'), findsOneWidget);
+
+        if (size.width < 1000) {
+          // Phone/tablet: the save bar is a short strip at the bottom and the
+          // form is visible above it.
+          final bar = t.getRect(find.ancestor(of: find.text('Save and restart'), matching: find.byType(FilledButton)));
+          expect(bar.bottom, greaterThan(size.height - 40));
+          expect(bar.top, greaterThan(size.height - 120));
+          expect(t.getTopLeft(find.text('Phone status')).dy, lessThan(size.height / 2));
+        }
       });
     }
   }

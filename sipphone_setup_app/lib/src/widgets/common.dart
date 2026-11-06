@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../phone_session.dart';
 import '../theme.dart';
 
-/// Centers [child] and caps its width so wide screens don't stretch content.
+/// Centers [child] horizontally and caps its width so wide screens don't
+/// stretch content. Takes only the child's height (heightFactor 1), so it is
+/// safe in slots with loose height constraints such as bottomNavigationBar.
 class ContentWidth extends StatelessWidget {
   const ContentWidth({super.key, required this.child, this.maxWidth = 1200, this.padding = EdgeInsets.zero});
   final Widget child;
@@ -13,6 +15,7 @@ class ContentWidth extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Align(
         alignment: Alignment.topCenter,
+        heightFactor: 1,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth + padding.horizontal),
           child: Padding(padding: padding, child: child),
