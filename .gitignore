@@ -1,2 +1,4 @@
 .build/
 release/
+ESP32S3_SipPhone/config.h
+ESP32S3_SipPhone/build/

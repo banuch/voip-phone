@@ -5,12 +5,15 @@ rem Usage: build.bat [COM5] [compile^|upload^|monitor^|all]
 rem Also accepts: build.bat compile
 rem Default: compile, upload, monitor. NOPAUSE=1 disables error pauses.
 rem Override AUDIO_FQBN if your board needs different USB/flash/PSRAM settings.
+rem Set AUDIO_SKETCH=ESP32S3_SipPhone to build another sketch folder.
 
 set "FQBN=esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,FlashSize=16M,PartitionScheme=default,PSRAM=opi"
 if defined AUDIO_FQBN set "FQBN=%AUDIO_FQBN%"
 set "BAUD=115200"
-set "SKETCH=%~dp0ESP32S3_AudioWebTest"
-set "BUILD=%~dp0.build\audio-web-batch"
+set "SKETCH_NAME=ESP32S3_AudioWebTest"
+if defined AUDIO_SKETCH set "SKETCH_NAME=%AUDIO_SKETCH%"
+set "SKETCH=%~dp0%SKETCH_NAME%"
+set "BUILD=%~dp0.build\%SKETCH_NAME%-batch"
 set "RELEASE=%~dp0release"
 set "PORT=%~1"
 set "MODE=%~2"
@@ -38,14 +41,14 @@ if errorlevel 1 (
   echo [ERROR] arduino-cli not found in PATH.
   goto :fail
 )
-if not exist "%SKETCH%\ESP32S3_AudioWebTest.ino" (
+if not exist "%SKETCH%\%SKETCH_NAME%.ino" (
   echo [ERROR] Sketch missing: %SKETCH%
   goto :fail
 )
 if /i "%MODE%"=="monitor" goto :detect
 
 echo.
-echo [1/3] Compiling ESP32-S3 audio web test
+echo [1/3] Compiling %SKETCH_NAME%
 echo Board: %FQBN%
 call arduino-cli compile --fqbn "%FQBN%" --build-path "%BUILD%" --output-dir "%RELEASE%" "%SKETCH%"
 if errorlevel 1 (
