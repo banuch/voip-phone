@@ -15,7 +15,7 @@ constexpr int MIC_GAIN = 4; // Reduce if clipping; increase if quiet.
 WebServer server(80);
 I2SClass audio;
 File sound, uploadFile;
-enum Mode { IDLE, RECORDING, PLAYING };
+enum Mode { IDLE, RECORDING, PLAYING, MONITORING };
 Mode mode = IDLE;
 String message = "Ready", uploadError;
 bool audioReady = false, fsReady = false, uploading = false;
@@ -84,10 +84,77 @@ bool inspectWav(File &f, uint32_t &offset, uint32_t &length) {
   return fmt && data && f.seek(offset);
 }
 
+// ---------- Microphone debug (Serial Monitor, 115200 baud) ----------
+// Collects raw 32-bit slot statistics for BOTH channels so you can tell:
+//  - all zeros on both   -> no data on SD (GPIO6), no clocks, or mic unpowered
+//  - all 0xFFFFFFFF      -> SD line floating/stuck high
+//  - data only on Right  -> INMP441 L/R pin is high/floating (should be GND)
+//  - timeouts > 0        -> I2S read returned nothing (driver/clock problem)
+struct MicDebug {
+  uint32_t reads, timeouts, oddReads, bytes, frames;
+  uint32_t zeroL, zeroR, onesL, onesR;
+  int32_t minL, maxL, minR, maxR, lastL, lastR;
+  uint32_t lastPrint, started;
+} dbg;
+void dbgResetWindow() {
+  dbg.frames=dbg.zeroL=dbg.zeroR=dbg.onesL=dbg.onesR=0;
+  dbg.minL=dbg.minR=INT32_MAX; dbg.maxL=dbg.maxR=INT32_MIN;
+  dbg.lastL=dbg.lastR=0;
+}
+void dbgReset() {
+  memset(&dbg,0,sizeof(dbg));
+  dbgResetWindow();
+  dbg.lastPrint=dbg.started=millis();
+}
+void dbgAccumulate(const int32_t *raw,size_t frames) {
+  for(size_t i=0;i<frames;i++) {
+    int32_t l=raw[i*2], r=raw[i*2+1];
+    if(l==0) dbg.zeroL++;
+    if(r==0) dbg.zeroR++;
+    if(l==-1) dbg.onesL++;
+    if(r==-1) dbg.onesR++;
+    dbg.minL=min(dbg.minL,l); dbg.maxL=max(dbg.maxL,l);
+    dbg.minR=min(dbg.minR,r); dbg.maxR=max(dbg.maxR,r);
+    dbg.lastL=l; dbg.lastR=r;
+  }
+  dbg.frames+=frames;
+}
+// Prints at most every 500 ms (or immediately when force=true).
+void dbgPrint(const char *tag,bool force=false) {
+  if(!force && millis()-dbg.lastPrint<500) return;
+  dbg.lastPrint=millis();
+  Serial.printf("[%s] t=%lums reads=%lu timeouts=%lu odd=%lu totalBytes=%lu windowFrames=%lu\n",
+    tag,(unsigned long)(millis()-dbg.started),(unsigned long)dbg.reads,(unsigned long)dbg.timeouts,
+    (unsigned long)dbg.oddReads,(unsigned long)dbg.bytes,(unsigned long)dbg.frames);
+  if(dbg.frames) {
+    Serial.printf("   L: min=%ld max=%ld last=0x%08lX (>>16=%d) zeros=%lu ones=%lu\n",
+      (long)dbg.minL,(long)dbg.maxL,(unsigned long)dbg.lastL,(int)(dbg.lastL>>16),(unsigned long)dbg.zeroL,(unsigned long)dbg.onesL);
+    Serial.printf("   R: min=%ld max=%ld last=0x%08lX (>>16=%d) zeros=%lu ones=%lu\n",
+      (long)dbg.minR,(long)dbg.maxR,(unsigned long)dbg.lastR,(int)(dbg.lastR>>16),(unsigned long)dbg.zeroR,(unsigned long)dbg.onesR);
+    Serial.printf("   peak16=%d recorded=%lu bytes\n",peak,(unsigned long)recorded);
+    if(dbg.zeroL==dbg.frames && dbg.zeroR==dbg.frames) Serial.println("   !! Both channels all zero: check SD->GPIO6, SCK->GPIO4, WS->GPIO5, mic 3V3/GND");
+    else if(dbg.onesL==dbg.frames && dbg.onesR==dbg.frames) Serial.println("   !! All 0xFFFFFFFF: SD line floating or stuck high");
+    else if(dbg.zeroL==dbg.frames) Serial.println("   !! Signal on RIGHT only: tie INMP441 L/R to GND (code reads LEFT)");
+  }
+  dbgResetWindow();
+}
+// Read one block from the mic and update debug stats. Returns bytes read.
+size_t micRead(int32_t *raw,size_t size) {
+  size_t n=audio.readBytes((char*)raw,size);
+  dbg.reads++; dbg.bytes+=n;
+  if(!n) dbg.timeouts++;
+  else if(n%8) dbg.oddReads++;
+  if(n>=8) dbgAccumulate(raw,n/8);
+  return n;
+}
+
 bool beginAudio(bool rx) {
   audio.setPins(BCLK_PIN,WS_PIN,rx ? -1 : SPEAKER_PIN,rx ? MIC_PIN : -1);
   // 32-bit stereo wire slots keep the INMP441's 24-bit signal intact.
   audioReady=audio.begin(I2S_MODE_STD,RATE,I2S_DATA_BIT_WIDTH_32BIT,I2S_SLOT_MODE_STEREO);
+  Serial.printf("[I2S] begin %s: BCLK=%d WS=%d %s=%d rate=%lu 32bit stereo -> %s\n",
+    rx ? "RX(mic)" : "TX(spk)",BCLK_PIN,WS_PIN,rx ? "DIN" : "DOUT",rx ? MIC_PIN : SPEAKER_PIN,
+    (unsigned long)RATE,audioReady ? "OK" : "FAILED");
   return audioReady;
 }
 void finish(const String &why) {
@@ -109,6 +176,8 @@ void finish(const String &why) {
     if(headerOk) headerOk=LittleFS.rename("/capture.wav","/record.wav");
     if(!headerOk) LittleFS.remove("/capture.wav");
   }
+  if(wasRecording || mode==MONITORING) dbgPrint(wasRecording ? "REC" : "MON",true);
+  Serial.printf("[AUDIO] finish: %s (recorded=%lu bytes, save %s)\n",why.c_str(),(unsigned long)recorded,headerOk ? "ok" : "FAILED");
   mode=IDLE; message=headerOk ? why : "Failed to finalize recording"; peak=0;
 }
 void replyError(int code,const String &s) { server.send(code,"text/plain",s); }
@@ -127,6 +196,8 @@ void recordStart() {
   recorded=0;
   recordLimit=seconds*RATE*2; discardFrames=RATE/10; // Flush startup transient.
   mode=RECORDING; peak=0; message="Recording microphone";
+  dbgReset();
+  Serial.printf("[REC] start %d s, limit=%lu bytes, gain=%d\n",seconds,(unsigned long)recordLimit,MIC_GAIN);
   server.send(200,"text/plain","Recording started");
 }
 void playStart() {
@@ -151,8 +222,8 @@ void playStart() {
 void audioStep() {
   if(mode==RECORDING) {
     int32_t raw[256]; int16_t pcm[128];
-    size_t n=audio.readBytes((char*)raw,sizeof(raw));
-    if(!n || n%8) { finish("Microphone read failed"); return; }
+    size_t n=micRead(raw,sizeof(raw));
+    if(!n || n%8) { Serial.printf("[REC] bad read: n=%u\n",(unsigned)n); finish("Microphone read failed"); return; }
     size_t count=0; peak=0;
     for(size_t i=0;i<n/8;i++) {
       if(discardFrames) { --discardFrames; continue; }
@@ -165,7 +236,18 @@ void audioStep() {
     size_t bytes=count*2;
     if(bytes) memcpy(audioBuffer+recorded,pcm,bytes);
     recorded+=bytes;
+    dbgPrint("REC");
     if(recorded>=recordLimit) finish("Recording ready");
+  } else if(mode==MONITORING) {
+    // Live mic monitor from Serial: read and print stats, store nothing.
+    int32_t raw[256];
+    size_t n=micRead(raw,sizeof(raw));
+    peak=0;
+    for(size_t i=0;i<n/8;i++) {
+      int64_t v=int64_t(raw[i*2]>>16)*MIC_GAIN;
+      peak=max(peak,abs(int(constrain(v,int64_t(-32768),int64_t(32767)))));
+    }
+    dbgPrint("MON");
   } else if(mode==PLAYING) {
     int16_t pcm[128]; int32_t stereo[256];
     size_t want=min(uint32_t(sizeof(pcm)),remaining);
@@ -229,9 +311,10 @@ void setup() {
   if(!audioBuffer) message="PSRAM unavailable: enable correct PSRAM type in Arduino Tools";
   WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
   Serial.println("Joining Wi-Fi (2.4 GHz). Waiting for DHCP…");
+  Serial.println("Serial debug: 'm' = toggle live mic monitor, 'p' = probe SD pin, 'h' = help");
   server.on("/",HTTP_GET,[]{server.send_P(200,"text/html",PAGE);});
   server.on("/status",HTTP_GET,[]{
-    String state=uploading ? "Uploading" : mode==RECORDING ? "Recording" : mode==PLAYING ? "Playing" : "Idle";
+    String state=uploading ? "Uploading" : mode==RECORDING ? "Recording" : mode==PLAYING ? "Playing" : mode==MONITORING ? "Monitoring" : "Idle";
     String json="{\"mode\":\""+state+"\",\"message\":\""+message+"\",\"seconds\":"+String(recorded/32000.0,2)+",\"peak\":"+String(peak)+",\"ready\":"+(fsReady && audioBuffer?"true":"false")+",\"upload\":"+(fsReady && LittleFS.exists("/upload.wav")?"true":"false")+",\"record\":"+(fsReady && LittleFS.exists("/record.wav")?"true":"false")+"}";
     json.remove(json.length()-1);
     json+=",\"psramBytes\":"+String(ESP.getPsramSize())+",\"bufferBytes\":"+String(audioBuffer ? MAX_DATA : 0)+"}";
@@ -263,6 +346,25 @@ void loop() {
     lastCheck=millis(); bool now=WiFi.status()==WL_CONNECTED;
     if(now && !connected) {Serial.print("Open http://"); Serial.println(WiFi.localIP());}
     connected=now;
+  }
+  // Serial commands: 'm' toggles live mic monitor, 'p' probes the SD pin, 'h' help.
+  while(Serial.available()) {
+    char c=Serial.read();
+    if(c=='m') {
+      if(mode==MONITORING) finish("Monitor stopped");
+      else if(mode!=IDLE || uploading) Serial.println("[MON] busy; stop current operation first");
+      else if(beginAudio(true)) { dbgReset(); recorded=0; peak=0; mode=MONITORING; message="Mic monitor (serial)"; Serial.println("[MON] started; send 'm' to stop"); }
+    } else if(c=='p') {
+      if(mode!=IDLE) { Serial.println("[PIN] stop audio first"); continue; }
+      // With I2S stopped the mic has no clock, so its SD output should be tri-stated.
+      pinMode(MIC_PIN,INPUT_PULLUP); delay(2); int up=digitalRead(MIC_PIN);
+      pinMode(MIC_PIN,INPUT_PULLDOWN); delay(2); int down=digitalRead(MIC_PIN);
+      pinMode(MIC_PIN,INPUT);
+      Serial.printf("[PIN] GPIO%d pullup=%d pulldown=%d -> %s\n",MIC_PIN,up,down,
+        up==1&&down==0 ? "tri-state (normal when idle)" : up==0&&down==0 ? "held LOW (short to GND?)" : up==1&&down==1 ? "held HIGH (short to 3V3?)" : "odd");
+    } else if(c=='h' || c=='?') {
+      Serial.println("Commands: m = toggle mic monitor, p = probe SD pin, h = help");
+    }
   }
   server.handleClient(); audioStep(); delay(1);
 }
