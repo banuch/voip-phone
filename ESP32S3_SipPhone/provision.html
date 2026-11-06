@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SIP Phone Setup</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--text:#18202c;--muted:#5d6b7e;--line:#d8dee8;--accent:#0f766e;--accent-text:#fff;--bad:#b42318;--good:#067647;--warn:#9a6700;--field:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1622;--card:#182233;--text:#e6edf7;--muted:#9eadc2;--line:#2b3a50;--accent:#5eead4;--accent-text:#062a26;--bad:#ff9b8f;--good:#7ee2a8;--warn:#f5c86b;--field:#111a28}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:24px;margin:0 0 4px}
+h2{font-size:16px;margin:0 0 12px}
+p.lead{color:var(--muted);margin:0 0 20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+label.check{flex-direction:row;align-items:center;gap:8px;color:var(--text)}
+input{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+input[type=checkbox]{width:auto}
+input:focus{outline:2px solid var(--accent);outline-offset:1px}
+small{color:var(--muted);font-size:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:600;border:0;border-radius:9px;padding:10px 16px;cursor:pointer;background:var(--accent);color:var(--accent-text)}
+button.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+button:disabled{opacity:.45;cursor:default}
+.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat b{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.stat span{font-weight:600;word-break:break-word}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+#message{min-height:1.4em;margin:10px 0 0;white-space:pre-wrap}
+#unsupported{display:none;color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>SIP Phone Setup</h1>
+<p class="lead">Configure the ESP32-S3 SIP phone over Bluetooth. Put the phone in setup mode first: it starts by itself when unconfigured, or hold BOOT for 3 seconds.</p>
+
+<section>
+  <div class="row">
+    <button id="connect">Connect</button>
+    <button id="disconnect" class="secondary" disabled>Disconnect</button>
+    <span id="device" class="muted"></span>
+  </div>
+  <p id="unsupported">This browser has no Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS or Linux (on iPhone: the Bluefy browser).</p>
+  <p id="message" role="status"></p>
+</section>
+
+<section>
+  <h2>Device status</h2>
+  <div class="status">
+    <div class="stat"><b>Wi-Fi</b><span id="st-wifi">-</span></div>
+    <div class="stat"><b>IP address</b><span id="st-ip">-</span></div>
+    <div class="stat"><b>SIP</b><span id="st-sip">-</span></div>
+    <div class="stat"><b>Call</b><span id="st-call">-</span></div>
+  </div>
+  <p><small id="st-detail"></small></p>
+</section>
+
+<form id="form">
+<section>
+  <h2>Wi-Fi</h2>
+  <div class="grid">
+    <label>Network name (SSID)<input name="wifi_ssid" maxlength="32" required autocomplete="off"></label>
+    <label>Password<input name="wifi_password" type="password" maxlength="63" autocomplete="new-password"><small id="wifi-pw-note">2.4 GHz networks only</small></label>
+  </div>
+  <p><label class="check"><input type="checkbox" id="wifi_open"> Open network (no password)</label></p>
+</section>
+
+<section>
+  <h2>SIP account</h2>
+  <div class="grid">
+    <label>Server (IP or hostname)<input name="sip_server" maxlength="64" required placeholder="192.168.1.50"></label>
+    <label>Server port<input name="sip_server_port" type="number" min="1" max="65535" required></label>
+    <label>Extension / user<input name="sip_user" maxlength="32" required placeholder="1001"></label>
+    <label>Password<input name="sip_password" type="password" maxlength="64" autocomplete="new-password"><small id="sip-pw-note"></small></label>
+    <label>Auth user (optional)<input name="sip_auth_user" maxlength="32" placeholder="same as extension"></label>
+    <label>Domain (optional)<input name="sip_domain" maxlength="64" placeholder="same as server"></label>
+  </div>
+</section>
+
+<section>
+  <h2>Call and audio</h2>
+  <div class="grid">
+    <label>Auto-answer delay (ms)<input name="auto_answer_ms" type="number" min="-1" max="60000" required><small>-1 = answer with the button only</small></label>
+    <label>Speaker volume (%)<input name="speaker_volume" type="number" min="0" max="100" required></label>
+    <label>Mic gain<input name="mic_gain" type="number" min="1" max="32" required></label>
+  </div>
+</section>
+
+<section>
+  <h2>Advanced</h2>
+  <div class="grid">
+    <label>Registration expiry (s)<input name="sip_expires" type="number" min="60" max="86400" required></label>
+    <label>Local SIP port<input name="sip_local_port" type="number" min="1" max="65535" required></label>
+    <label>Local RTP port<input name="rtp_local_port" type="number" min="1" max="65535" required></label>
+  </div>
+</section>
+
+<section>
+  <div class="row">
+    <button type="submit" id="save" disabled>Save and restart</button>
+    <button type="button" id="reload" class="secondary" disabled>Reload from device</button>
+    <button type="button" id="exit" class="secondary" disabled>Turn off Bluetooth</button>
+    <button type="button" id="reset" class="danger" disabled>Factory reset</button>
+  </div>
+  <p><small>Leave a password field empty to keep the saved password. Passwords are never read back from the device.</small></p>
+</section>
+</form>
+</main>
+
+<script>
+const SERVICE = '6b3f0001-7c1a-4d2e-9b8f-2a1c5e7d9f01';
+const CONFIG = '6b3f0002-7c1a-4d2e-9b8f-2a1c5e7d9f01';
+const COMMAND = '6b3f0003-7c1a-4d2e-9b8f-2a1c5e7d9f01';
+const STATUS = '6b3f0004-7c1a-4d2e-9b8f-2a1c5e7d9f01';
+const NUMBERS = ['sip_server_port','sip_local_port','rtp_local_port','sip_expires','auto_answer_ms','mic_gain','speaker_volume'];
+const TEXTS = ['wifi_ssid','sip_server','sip_domain','sip_user','sip_auth_user'];
+const $ = id => document.getElementById(id);
+const form = $('form');
+const enc = new TextEncoder(), dec = new TextDecoder();
+let device = null, chr = {}, reconnecting = false, savedPending = false;
+
+function say(text, cls = '') { const m = $('message'); m.textContent = text; m.className = cls; }
+function setConnected(on) {
+  for (const id of ['save','reload','exit','reset']) $(id).disabled = !on;
+  $('disconnect').disabled = !on;
+  $('connect').disabled = on;
+}
+
+function fill(cfg) {
+  for (const k of TEXTS) form.elements[k].value = cfg[k] ?? '';
+  for (const k of NUMBERS) form.elements[k].value = cfg[k] ?? '';
+  form.elements.wifi_password.value = '';
+  form.elements.sip_password.value = '';
+  $('wifi-pw-note').textContent = cfg.wifi_password_set ? 'Saved. Leave empty to keep it. 2.4 GHz only.' : 'Not set. 2.4 GHz only.';
+  $('sip-pw-note').textContent = cfg.sip_password_set ? 'Saved. Leave empty to keep it.' : 'Not set';
+  $('wifi_open').checked = false;
+}
+
+function showStatus(s) {
+  const set = (id, text, cls) => { $(id).textContent = text || '-'; $(id).className = cls || ''; };
+  set('st-wifi', s.wifi + (s.rssi ? ` (${s.rssi} dBm)` : ''), s.wifi === 'connected' ? 'good' : s.wifi === 'not set' ? 'bad' : 'warn');
+  set('st-ip', s.ip);
+  set('st-sip', s.sip, s.sip === 'registered' ? 'good' : s.configured ? 'warn' : 'bad');
+  set('st-call', s.call);
+  $('st-detail').textContent = s.sip_detail ? 'SIP: ' + s.sip_detail : '';
+  if (s.result === 'error') say('Device rejected the settings: ' + s.detail, 'bad');
+  else if (s.result === 'saved') { savedPending = true; say('Saved. The phone is restarting to apply them, and this page will reconnect...', 'good'); }
+  else if (s.result === 'reset') say('Settings erased. The phone is restarting...', 'warn');
+  else if (s.result === 'exiting') say('Bluetooth turned off on the phone.', '');
+}
+
+async function readJson(c) { return JSON.parse(dec.decode(await c.readValue())); }
+
+// Windows often fails the first GATT connection to a new device; retry a few times.
+async function connectGatt(tries = 4) {
+  for (let i = 1; ; i++) {
+    try { return await device.gatt.connect(); }
+    catch (e) {
+      if (i >= tries) throw e;
+      say(`Connection attempt ${i} failed, retrying...`, 'warn');
+      await new Promise(r => setTimeout(r, 1000 * i));
+    }
+  }
+}
+
+async function attach() {
+  const gatt = await connectGatt();
+  const svc = await gatt.getPrimaryService(SERVICE);
+  chr.config = await svc.getCharacteristic(CONFIG);
+  chr.command = await svc.getCharacteristic(COMMAND);
+  chr.status = await svc.getCharacteristic(STATUS);
+  chr.status.addEventListener('characteristicvaluechanged', e => showStatus(JSON.parse(dec.decode(e.target.value))));
+  await chr.status.startNotifications();
+  showStatus(await readJson(chr.status));
+  fill(await readJson(chr.config));  // encrypted: triggers pairing the first time
+  setConnected(true);
+  $('device').textContent = device.name || 'SIP phone';
+}
+
+async function connect() {
+  try {
+    say('Choose your phone (SipPhone-XXXX) in the browser dialog...');
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    say('Connecting (accept the pairing prompt if one appears)...');
+    await attach();
+    say('Connected. Settings loaded.', 'good');
+  } catch (e) {
+    if (e.name !== 'NotFoundError') say('Connection failed: ' + e.message, 'bad');
+    else say('');
+    setConnected(false);
+  }
+}
+
+async function onDisconnected() {
+  setConnected(false);
+  $('device').textContent = '';
+  if (!savedPending || reconnecting) return;
+  reconnecting = true;
+  // After a save the phone reboots back into setup mode; try to reattach.
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      await attach();
+      savedPending = false;
+      say('Reconnected after restart. Check the Wi-Fi and SIP status above.', 'good');
+      break;
+    } catch (e) { say(`Waiting for the phone to restart (attempt ${attempt})...`, 'warn'); }
+  }
+  if (savedPending) { say('Phone did not come back. Press Connect to try again.', 'warn'); savedPending = false; }
+  reconnecting = false;
+}
+
+async function command(cmd) { await chr.command.writeValueWithResponse(enc.encode(cmd)); }
+
+async function save(ev) {
+  ev.preventDefault();
+  if (!form.reportValidity()) return;
+  const cfg = {};
+  for (const k of TEXTS) cfg[k] = form.elements[k].value.trim();
+  for (const k of NUMBERS) cfg[k] = Number(form.elements[k].value);
+  const wpw = form.elements.wifi_password.value;
+  if ($('wifi_open').checked) cfg.wifi_password = '';
+  else if (wpw) {
+    if (wpw.length < 8) { say('Wi-Fi password must be at least 8 characters.', 'bad'); return; }
+    cfg.wifi_password = wpw;
+  }
+  if (form.elements.sip_password.value) cfg.sip_password = form.elements.sip_password.value;
+  if (cfg.sip_local_port === cfg.rtp_local_port) { say('SIP and RTP local ports must differ.', 'bad'); return; }
+  try {
+    $('save').disabled = true;
+    say('Sending settings...');
+    const bytes = enc.encode(JSON.stringify(cfg));
+    await command('begin');
+    for (let i = 0; i < bytes.length; i += 100) await chr.config.writeValueWithResponse(bytes.slice(i, i + 100));
+    await command('save');
+    say('Settings sent, waiting for the phone to confirm...');
+  } catch (e) {
+    say('Save failed: ' + e.message, 'bad');
+  } finally {
+    $('save').disabled = !device?.gatt.connected;
+  }
+}
+
+$('connect').onclick = connect;
+$('disconnect').onclick = () => { savedPending = false; device?.gatt.disconnect(); };
+$('reload').onclick = async () => { try { fill(await readJson(chr.config)); say('Reloaded from device.'); } catch (e) { say(e.message, 'bad'); } };
+$('exit').onclick = async () => { try { await command('exit'); } catch (e) { say(e.message, 'bad'); } };
+$('reset').onclick = async () => {
+  if (!confirm('Erase all saved settings on the phone?')) return;
+  try { await command('factory_reset'); } catch (e) { say(e.message, 'bad'); }
+};
+$('wifi_open').onchange = e => { form.elements.wifi_password.disabled = e.target.checked; };
+form.addEventListener('submit', save);
+if (!navigator.bluetooth) { $('unsupported').style.display = 'block'; $('connect').disabled = true; }
+</script>
+</body>
+</html>

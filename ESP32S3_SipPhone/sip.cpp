@@ -4,6 +4,7 @@
 #include "sip.h"
 #include "app_config.h"
 #include "audio.h"
+#include "settings.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <MD5Builder.h>
@@ -11,7 +12,8 @@
 
 namespace {
 
-const char *USER_AGENT = "ESP32S3-SipPhone/1.0";
+using settings::cfg;
+const char *USER_AGENT = "ESP32S3-SipPhone/1.1";
 const char *ALLOW = "INVITE, ACK, CANCEL, BYE, OPTIONS, NOTIFY";
 
 // ---------------------------------------------------------------- parsing
@@ -184,11 +186,11 @@ bool started = false;
 IPAddress serverIp;
 String localIp;
 
-String domain() { return strlen(SIP_DOMAIN) ? String(SIP_DOMAIN) : String(SIP_SERVER); }
-String authUser() { return strlen(SIP_AUTH_USER) ? String(SIP_AUTH_USER) : String(SIP_USER); }
-String contactUri() { return "<sip:" + String(SIP_USER) + "@" + localIp + ":" + String(SIP_LOCAL_PORT) + ">"; }
+String domain() { return cfg.domain(); }
+String authUser() { return cfg.authUser(); }
+String contactUri() { return "<sip:" + cfg.sipUser + "@" + localIp + ":" + String(cfg.sipLocalPort) + ">"; }
 String viaHeader() {
-  return "Via: SIP/2.0/UDP " + localIp + ":" + String(SIP_LOCAL_PORT) + ";branch=z9hG4bK" + randomHex(8) + ";rport\r\n";
+  return "Via: SIP/2.0/UDP " + localIp + ":" + String(cfg.sipLocalPort) + ";branch=z9hG4bK" + randomHex(8) + ";rport\r\n";
 }
 
 void sendTo(IPAddress ip, uint16_t port, const String &msg) {
@@ -203,7 +205,7 @@ RegState regState = REG_IDLE;
 bool isRegistered = false;
 String regCallId, regFromTag, regAuth, regPacket, regLastError = "not started";
 uint32_t regCseq = 0, regSentAt = 0, regNextAt = 0, regInterval = 500, regFirstSent = 0;
-int regAuthTries = 0, regExpires = SIP_EXPIRES;
+int regAuthTries = 0, regExpires = 300;
 
 // Answers a Digest challenge; prefers an MD5 challenge when several are offered.
 bool buildAuth(const Message &resp, const String &method, const String &uri, String &out) {
@@ -218,7 +220,7 @@ bool buildAuth(const Message &resp, const String &method, const String &uri, Str
   if (ch.isEmpty()) return false;
   String realm = authParam(ch, "realm"), nonce = authParam(ch, "nonce");
   String opaque = authParam(ch, "opaque"), qop = authParam(ch, "qop");
-  String ha1 = md5(authUser() + ":" + realm + ":" + SIP_PASSWORD);
+  String ha1 = md5(authUser() + ":" + realm + ":" + cfg.sipPassword);
   String ha2 = md5(method + ":" + uri);
   bool useQop = qop.indexOf("auth") >= 0;
   String cnonce = randomHex(8), nc = "00000001";
@@ -235,7 +237,7 @@ bool buildAuth(const Message &resp, const String &method, const String &uri, Str
 
 void sendRegister() {
   String uri = "sip:" + domain();
-  String aor = "<sip:" + String(SIP_USER) + "@" + domain() + ">";
+  String aor = "<sip:" + cfg.sipUser + "@" + domain() + ">";
   regCseq++;
   regPacket = "REGISTER " + uri + " SIP/2.0\r\n" + viaHeader() +
               "Max-Forwards: 70\r\n"
@@ -248,7 +250,7 @@ void sendRegister() {
               "Allow: " + ALLOW + "\r\n"
               "User-Agent: " + USER_AGENT + "\r\n"
               "Content-Length: 0\r\n\r\n";
-  sendTo(serverIp, SIP_SERVER_PORT, regPacket);
+  sendTo(serverIp, cfg.sipServerPort, regPacket);
   regState = REG_SENDING;
   regSentAt = regFirstSent = millis();
   regInterval = 500;
@@ -280,7 +282,7 @@ void handleRegisterResponse(const Message &m) {
     }
     if (exp == regExpires && m.get("expires").length()) exp = m.get("expires").toInt();
     if (exp <= 0) exp = regExpires;
-    if (!isRegistered) Serial.printf("[SIP] registered as %s@%s (expires %ds)\n", SIP_USER, domain().c_str(), exp);
+    if (!isRegistered) Serial.printf("[SIP] registered as %s@%s (expires %ds)\n", cfg.sipUser.c_str(), domain().c_str(), exp);
     isRegistered = true;
     regLastError = "";
     regState = REG_WAITING;
@@ -303,10 +305,10 @@ void handleRegisterResponse(const Message &m) {
 void registrationTimers() {
   if (regState == REG_SENDING && due(regSentAt + regInterval)) {
     if (millis() - regFirstSent > 16000) {
-      registrationFailed("no response from " + String(SIP_SERVER), 15000);
+      registrationFailed("no response from " + cfg.sipServer, 15000);
       return;
     }
-    sendTo(serverIp, SIP_SERVER_PORT, regPacket);
+    sendTo(serverIp, cfg.sipServerPort, regPacket);
     regSentAt = millis();
     regInterval = min<uint32_t>(regInterval * 2, 4000);
   } else if (regState != REG_SENDING && due(regNextAt)) {
@@ -387,7 +389,7 @@ String buildSdp() {
          "s=ESP32 call\r\n"
          "c=IN IP4 " + localIp + "\r\n"
          "t=0 0\r\n"
-         "m=audio " + String(RTP_LOCAL_PORT) + " RTP/AVP " + String(dlg.pt) + "\r\n"
+         "m=audio " + String(cfg.rtpLocalPort) + " RTP/AVP " + String(dlg.pt) + "\r\n"
          "a=rtpmap:" + codec + "\r\n"
          "a=ptime:20\r\n"
          "a=sendrecv\r\n";
@@ -500,7 +502,7 @@ void handleInvite(const Message &m, IPAddress ip, uint16_t port) {
   ringStart = millis();
   audio::setRinging(true);
   Serial.printf("[CALL] incoming from %s (%s)\n", uriOf(dlg.remote).c_str(), pt == 8 ? "PCMA" : "PCMU");
-  if (AUTO_ANSWER_MS >= 0) Serial.printf("[CALL] auto-answer in %d ms\n", AUTO_ANSWER_MS);
+  if (cfg.autoAnswerMs >= 0) Serial.printf("[CALL] auto-answer in %d ms\n", (int)cfg.autoAnswerMs);
   else Serial.println("[CALL] press BOOT or send 'a' to answer");
 }
 
@@ -549,7 +551,7 @@ void handleResponse(const Message &m) {
 }
 
 void callTimers() {
-  if (callState == CALL_RINGING && AUTO_ANSWER_MS >= 0 && millis() - ringStart >= (uint32_t)AUTO_ANSWER_MS) {
+  if (callState == CALL_RINGING && cfg.autoAnswerMs >= 0 && millis() - ringStart >= (uint32_t)cfg.autoAnswerMs) {
     sip::answer();
   } else if (callState == CALL_ANSWERING && due(okSentAt + okInterval)) {
     if (millis() - okFirstSent > 32000) {  // RFC 3261 timer H: no ACK
@@ -580,20 +582,21 @@ void onNetworkDown() {
 
 bool onNetworkUp() {
   localIp = WiFi.localIP().toString();
-  if (!WiFi.hostByName(SIP_SERVER, serverIp)) {
-    regLastError = "cannot resolve " + String(SIP_SERVER);
+  if (!WiFi.hostByName(cfg.sipServer.c_str(), serverIp)) {
+    regLastError = "cannot resolve " + cfg.sipServer;
     return false;
   }
-  if (!udp.begin(SIP_LOCAL_PORT)) {
-    regLastError = "cannot open UDP " + String(SIP_LOCAL_PORT);
+  if (!udp.begin(cfg.sipLocalPort)) {
+    regLastError = "cannot open UDP " + String(cfg.sipLocalPort);
     return false;
   }
   regCallId = randomHex(10) + "@" + localIp;
   regFromTag = randomHex(4);
   regCseq = 0;
+  regExpires = cfg.sipExpires;
   started = true;
-  Serial.printf("[SIP] local %s:%d, server %s:%d\n", localIp.c_str(), SIP_LOCAL_PORT,
-                serverIp.toString().c_str(), SIP_SERVER_PORT);
+  Serial.printf("[SIP] local %s:%u, server %s:%u\n", localIp.c_str(), (unsigned)cfg.sipLocalPort,
+                serverIp.toString().c_str(), (unsigned)cfg.sipServerPort);
   startRegistration();
   return true;
 }
@@ -606,6 +609,7 @@ namespace sip {
 
 void loop() {
   static uint32_t retryAt = 0;
+  if (!settings::configured()) return;
   if (WiFi.status() != WL_CONNECTED) {
     if (started) onNetworkDown();
     return;
@@ -666,6 +670,8 @@ void reRegister() {
 }
 
 bool registered() { return isRegistered; }
+String lastError() { return regLastError; }
+const char *callStateName() { return STATE_NAMES[callState]; }
 
 void printStatus() {
   audio::Stats a = audio::stats();

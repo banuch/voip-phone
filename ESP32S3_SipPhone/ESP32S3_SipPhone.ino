@@ -1,46 +1,78 @@
 // ESP32-S3 SIP phone: registers to a SIP server (e.g. Asterisk) and answers
 // incoming calls with two-way G.711 audio over INMP441 mic + MAX98357A speaker.
-// Arduino-ESP32 3.3.12, no external libraries. Settings live in config.h.
+// Arduino-ESP32 3.3.12, no external libraries.
 //
+// Settings are provisioned over Bluetooth LE (see provision.html) and stored
+// in flash. Setup mode starts automatically when unconfigured, or hold BOOT
+// for 3 seconds. config.h only supplies first-boot defaults and pin numbers.
+//
+// BOOT button: short press = answer / hang up, hold 3 s = Bluetooth setup mode.
 // Serial commands (115200 baud):
 //   a = answer   h = hang up / decline   s = status   r = re-register
-//   + / - = speaker volume   ] / [ = mic gain   ? = help
+//   + / - = speaker volume   ] / [ = mic gain   b = Bluetooth setup mode
+//   X = factory reset (erase saved settings)   ? = help
 #include <Arduino.h>
 #include <WiFi.h>
 #include "app_config.h"
+#include "settings.h"
 #include "audio.h"
 #include "sip.h"
+#include "ble_prov.h"
+
+constexpr uint32_t LONG_PRESS_MS = 3000;
 
 void help() {
-  Serial.println("Commands: a=answer h=hang up s=status r=re-register +/-=volume ]/[=mic gain ?=help");
+  Serial.println("Commands: a=answer h=hang up s=status r=re-register +/-=volume ]/[=mic gain b=BLE setup X=factory reset ?=help");
+  Serial.println("BOOT: short press = answer/hang up, hold 3 s = Bluetooth setup mode");
 }
+
+void saveLevels() { settings::saveAudio(audio::volume(), audio::micGain()); }
 
 void handleSerial() {
   while (Serial.available()) {
     switch (Serial.read()) {
       case 'a': sip::answer(); break;
       case 'h': sip::hangup(); break;
-      case 's': sip::printStatus(); break;
+      case 's':
+        sip::printStatus();
+        Serial.printf("[STATUS] Bluetooth setup %s, settings %s\n", ble_prov::active() ? "ON" : "off",
+                      settings::configured() ? "configured" : "NOT configured");
+        break;
       case 'r': sip::reRegister(); break;
-      case '+': audio::setVolume(audio::volume() + 10); Serial.printf("Volume %d%%\n", audio::volume()); break;
-      case '-': audio::setVolume(audio::volume() - 10); Serial.printf("Volume %d%%\n", audio::volume()); break;
-      case ']': audio::setMicGain(audio::micGain() + 1); Serial.printf("Mic gain %d\n", audio::micGain()); break;
-      case '[': audio::setMicGain(audio::micGain() - 1); Serial.printf("Mic gain %d\n", audio::micGain()); break;
+      case '+': audio::setVolume(audio::volume() + 10); saveLevels(); Serial.printf("Volume %d%%\n", audio::volume()); break;
+      case '-': audio::setVolume(audio::volume() - 10); saveLevels(); Serial.printf("Volume %d%%\n", audio::volume()); break;
+      case ']': audio::setMicGain(audio::micGain() + 1); saveLevels(); Serial.printf("Mic gain %d\n", audio::micGain()); break;
+      case '[': audio::setMicGain(audio::micGain() - 1); saveLevels(); Serial.printf("Mic gain %d\n", audio::micGain()); break;
+      case 'b': ble_prov::start(); break;
+      case 'X':
+        Serial.println("Erasing saved settings and restarting...");
+        settings::factoryReset();
+        delay(200);
+        ESP.restart();
+        break;
       case '?': help(); break;
       default: break;
     }
   }
 }
 
+// Short press acts on release; a 3 s hold enters setup mode while still held.
 void handleButton() {
-  static bool lastLevel = HIGH;
+  static bool lastLevel = HIGH, longDone = false;
   static uint32_t changedAt = 0;
-  static bool handled = false;
   bool level = digitalRead(ANSWER_BUTTON_PIN);
-  if (level != lastLevel) { lastLevel = level; changedAt = millis(); handled = false; }
-  if (level == LOW && !handled && millis() - changedAt > 50) {
-    handled = true;
-    sip::button();
+  uint32_t now = millis();
+  if (level != lastLevel) {
+    if (now - changedAt < 30) return;  // debounce
+    if (level == HIGH && !longDone && now - changedAt >= 50) sip::button();
+    lastLevel = level;
+    changedAt = now;
+    longDone = false;
+    return;
+  }
+  if (level == LOW && !longDone && now - changedAt >= LONG_PRESS_MS) {
+    longDone = true;
+    ble_prov::start();
   }
 }
 
@@ -57,15 +89,24 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n=== ESP32-S3 SIP phone ===");
-  Serial.printf("SIP %s@%s:%d, auto-answer %d ms\n", SIP_USER, SIP_SERVER, SIP_SERVER_PORT, AUTO_ANSWER_MS);
+  settings::begin();
+  const Settings &c = settings::cfg;
   pinMode(ANSWER_BUTTON_PIN, INPUT_PULLUP);
   if (!audio::begin()) Serial.println("[AUDIO] I2S init FAILED: check pins and board settings");
   else Serial.println("[AUDIO] I2S full duplex 16 kHz running");
-  WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false);  // power save adds large RTP latency/jitter
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.printf("[WIFI] joining %s...\n", WIFI_SSID);
+
+  if (settings::configured()) {
+    Serial.printf("SIP %s@%s:%u, auto-answer %d ms\n", c.sipUser.c_str(), c.sipServer.c_str(),
+                  (unsigned)c.sipServerPort, (int)c.autoAnswerMs);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);  // power save adds large RTP latency/jitter
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(c.wifiSsid.c_str(), c.wifiPassword.c_str());
+    Serial.printf("[WIFI] joining %s...\n", c.wifiSsid.c_str());
+  } else {
+    Serial.println("Not configured: use the Bluetooth setup page (provision.html)");
+  }
+  ble_prov::begin();
   help();
 }
 
@@ -74,5 +115,6 @@ void loop() {
   handleSerial();
   handleButton();
   sip::loop();
+  ble_prov::loop();
   delay(1);
 }

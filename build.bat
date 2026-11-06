@@ -7,11 +7,14 @@ rem Default: compile, upload, monitor. NOPAUSE=1 disables error pauses.
 rem Override AUDIO_FQBN if your board needs different USB/flash/PSRAM settings.
 rem Set AUDIO_SKETCH=ESP32S3_SipPhone to build another sketch folder.
 
-set "FQBN=esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,FlashSize=16M,PartitionScheme=default,PSRAM=opi"
-if defined AUDIO_FQBN set "FQBN=%AUDIO_FQBN%"
-set "BAUD=115200"
 set "SKETCH_NAME=ESP32S3_AudioWebTest"
 if defined AUDIO_SKETCH set "SKETCH_NAME=%AUDIO_SKETCH%"
+rem The SIP phone (Wi-Fi + Bluetooth) needs the 1.9 MB app slot of min_spiffs.
+set "PARTITION=default"
+if /i "%SKETCH_NAME%"=="ESP32S3_SipPhone" set "PARTITION=min_spiffs"
+set "FQBN=esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,FlashSize=16M,PartitionScheme=%PARTITION%,PSRAM=opi"
+if defined AUDIO_FQBN set "FQBN=%AUDIO_FQBN%"
+set "BAUD=115200"
 set "SKETCH=%~dp0%SKETCH_NAME%"
 set "BUILD=%~dp0.build\%SKETCH_NAME%-batch"
 set "RELEASE=%~dp0release"

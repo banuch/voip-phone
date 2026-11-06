@@ -7,6 +7,7 @@
 // speaker writes are paced by the same clock.
 #include "audio.h"
 #include "app_config.h"
+#include "settings.h"
 #include <ESP_I2S.h>
 #include <WiFiUdp.h>
 #include <math.h>
@@ -31,8 +32,8 @@ struct Pending {
   uint8_t pt = 0;
 } pending;
 volatile bool ringing = false;
-volatile int volumePct = SPEAKER_VOLUME;
-volatile int gain = MIC_GAIN;
+volatile int volumePct = 60;  // set from settings in audio::begin()
+volatile int gain = 4;
 audio::Stats st = {};
 
 // ---- State owned by the audio task ----
@@ -238,7 +239,7 @@ void applyPending() {
   if (!p.has) return;
   if (p.start) {
     if (!active) {
-      if (!rtp.begin(RTP_LOCAL_PORT)) { Serial.println("[RTP] cannot open UDP port"); return; }
+      if (!rtp.begin(settings::cfg.rtpLocalPort)) { Serial.println("[RTP] cannot open UDP port"); return; }
       txSeq = esp_random(); txTs = esp_random(); ssrc = esp_random();
       haveRxSeq = false; marker = true;
       jbReset();
@@ -279,6 +280,8 @@ void audioTask(void *) {
 namespace audio {
 
 bool begin() {
+  volumePct = constrain(settings::cfg.speakerVolume, 0, 100);
+  gain = constrain(settings::cfg.micGain, 1, 32);
   i2s.setPins(I2S_BCLK_PIN, I2S_WS_PIN, I2S_SPEAKER_PIN, I2S_MIC_PIN);
   if (!i2s.begin(I2S_MODE_STD, I2S_RATE, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO)) return false;
   i2s.setTimeout(200);
