@@ -6,3 +6,8 @@
 #else
 #include "config.example.h"
 #endif
+
+// Added after the first config.h files were written, so default them here.
+#ifndef OTA_PASSWORD
+#define OTA_PASSWORD ""
+#endif

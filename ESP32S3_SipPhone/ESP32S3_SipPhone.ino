@@ -6,6 +6,9 @@
 // and stored in flash. Bluetooth is always on, so the phone can be configured
 // at any time. config.h only supplies first-boot defaults and pin numbers.
 //
+// Firmware updates over Wi-Fi: http://<phone-ip>/update once an update
+// password is set over Bluetooth (see ota.h).
+//
 // BOOT button: press = answer when ringing, otherwise hang up.
 // Serial commands (115200 baud):
 //   a = answer   h = hang up / decline   s = status   r = re-register
@@ -18,6 +21,7 @@
 #include "audio.h"
 #include "sip.h"
 #include "ble_prov.h"
+#include "ota.h"
 
 void help() {
   Serial.println("Commands: a=answer h=hang up s=status r=re-register +/-=volume ]/[=mic gain X=factory reset ?=help");
@@ -35,6 +39,7 @@ void handleSerial() {
         sip::printStatus();
         Serial.printf("[STATUS] Bluetooth %s, settings %s\n", ble_prov::active() ? "on" : "FAILED",
                       settings::configured() ? "configured" : "NOT configured");
+        ota::printStatus();
         break;
       case 'r': sip::reRegister(); break;
       case '+': audio::setVolume(audio::volume() + 10); saveLevels(); Serial.printf("Volume %d%%\n", audio::volume()); break;
@@ -80,6 +85,7 @@ void setup() {
   delay(1000);
   Serial.println("\n=== ESP32-S3 SIP phone ===");
   settings::begin();
+  ota::begin();
   const Settings &c = settings::cfg;
   pinMode(ANSWER_BUTTON_PIN, INPUT_PULLUP);
   if (!audio::begin()) Serial.println("[AUDIO] I2S init FAILED: check pins and board settings");
@@ -106,5 +112,6 @@ void loop() {
   handleButton();
   sip::loop();
   ble_prov::loop();
+  ota::loop();
   delay(1);
 }

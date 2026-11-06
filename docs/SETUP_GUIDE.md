@@ -274,6 +274,10 @@ $env:AUDIO_FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,F
 
 Firmware images go to `release\`, build intermediates to `.build\`. If the upload fails, hold BOOT, tap RESET, release BOOT, and retry. If the COM number changes after upload, rerun `monitor` with the new port.
 
+### 5.3 Later updates over Wi-Fi
+
+Once the phone is on Wi-Fi, later firmware can go over the network instead of USB: set an **Update password** in the setup app, build with `.\build.bat compile`, open `http://<phone-ip>/update` (user `admin`) and upload `release\ESP32S3_SipPhone.ino.bin`. The phone writes it to its second firmware slot, restarts, and keeps it only if Wi-Fi is up for 30 s after the restart; otherwise it rolls back to the previous firmware. Bump `FW_VERSION` in `ESP32S3_SipPhone/version.h` for each release so the app and `s` show which version is running. Details: [ESP32S3_SipPhone/README.md](../ESP32S3_SipPhone/README.md#update-firmware-over-wi-fi).
+
 Arduino IDE alternative: board *ESP32S3 Dev Module*, core 3.3.12, Tools → Partition Scheme → *Minimal SPIFFS*, USB CDC On Boot enabled, open `ESP32S3_SipPhone/ESP32S3_SipPhone.ino`, upload.
 
 ---
@@ -313,8 +317,9 @@ flowchart TD
 | Auto-answer delay | `auto_answer_ms` | 1000 ms | −1 (manual only) to 60000 |
 | Mic gain | `mic_gain` | 4 | 1–32 |
 | Speaker volume | `speaker_volume` | 60 % | 0–100 |
+| Update password | `ota_password` | empty = Wi-Fi updates off | empty or 8–64 chars |
 
-The phone counts as **configured** once Wi-Fi SSID, SIP server and SIP user are all set. Passwords are write-only: the phone reports only `wifi_password_set` / `sip_password_set`, and an empty password field in the app keeps the stored one.
+The phone counts as **configured** once Wi-Fi SSID, SIP server and SIP user are all set. Passwords are write-only: the phone reports only `wifi_password_set` / `sip_password_set` / `ota_password_set`, and an empty password field in the app keeps the stored one.
 
 ### 6.3 Baking settings into the firmware (optional)
 
@@ -456,7 +461,7 @@ Service `6b3f0001-7c1a-4d2e-9b8f-2a1c5e7d9f01`:
 | --- | --- | --- | --- |
 | Config | `6b3f0002-…` | read / write, encrypted | Settings JSON (keys from §6.2), max 2048 bytes |
 | Command | `6b3f0003-…` | write, encrypted | `begin`, `save`, `reboot`, `factory_reset` |
-| Status | `6b3f0004-…` | read / notify (1 s) | `configured`, `wifi`, `ip`, `rssi`, `sip`, `sip_detail`, `call`, `result`, `detail` |
+| Status | `6b3f0004-…` | read / notify (1 s) | `configured`, `wifi`, `ip`, `rssi`, `sip`, `sip_detail`, `call`, `fw`, `ota_url`, `result`, `detail` |
 
 Save sequence: write `begin` to Command → write the JSON to Config in one or more chunks (appended) → write `save`. Keys you leave out keep their values. On success Status reports `result: "saved"` and the phone restarts.
 
@@ -485,7 +490,7 @@ Pairing is "Just Works" with LE Secure Connections: the link is encrypted but th
 | --- | --- |
 | BOOT button | Answer when ringing, otherwise hang up |
 | Serial `a` / `h` | Answer / hang up or decline |
-| Serial `s` | Status: Wi-Fi, registration, call, RTP counters, mic peak, Bluetooth |
+| Serial `s` | Status: Wi-Fi, registration, call, RTP counters, mic peak, Bluetooth, firmware version and update link |
 | Serial `r` | Re-register now |
 | Serial `+` / `-` | Speaker volume ±10 % (saved) |
 | Serial `]` / `[` | Mic gain ±1 (saved) |
@@ -511,6 +516,7 @@ Pairing is "Just Works" with LE Secure Connections: the link is encrypted but th
 | Choppy audio | Check `underruns`, `lost` and RSSI in `s`; close the setup app; move closer to the AP. |
 | Echo or howling | No echo cancellation: lower volume (`-`) and mic gain (`[`), separate mic and speaker. |
 | Upload fails | Hold BOOT, tap RESET, release BOOT; check the COM port. |
+| Wi-Fi update: 403 / 401 / image rejected | 403: set an update password in the app. 401: user is `admin` with the update password. Rejected: upload `ESP32S3_SipPhone.ino.bin`, not the merged image. |
 | Firmware too big for partition | Use the Minimal SPIFFS partition scheme (`build.bat` does this automatically for the SIP phone). |
 
 ---
@@ -523,4 +529,5 @@ Pairing is "Just Works" with LE Secure Connections: the link is encrypted but th
 - No acoustic echo cancellation.
 - Pins are build-time only (`config.h`).
 - Bluetooth setup is open to anyone in range (encrypted, no PIN).
+- Wi-Fi firmware updates use plain HTTP with a password; images are not signed.
 - The Asterisk configuration above is an example: it is not stored or tested in this repository.

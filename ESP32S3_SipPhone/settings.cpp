@@ -15,6 +15,7 @@ Settings defaults() {
   s.sipUser = SIP_USER;
   s.sipAuthUser = SIP_AUTH_USER;
   s.sipPassword = SIP_PASSWORD;
+  s.otaPassword = OTA_PASSWORD;
   s.sipServerPort = SIP_SERVER_PORT;
   s.sipLocalPort = SIP_LOCAL_PORT;
   s.rtpLocalPort = RTP_LOCAL_PORT;
@@ -114,6 +115,7 @@ void begin() {
   cfg.sipUser = p.getString("sip_user", d.sipUser);
   cfg.sipAuthUser = p.getString("sip_auth", d.sipAuthUser);
   cfg.sipPassword = p.getString("sip_pass", d.sipPassword);
+  cfg.otaPassword = p.getString("ota_pass", d.otaPassword);
   cfg.sipServerPort = p.getUShort("srv_port", d.sipServerPort);
   cfg.sipLocalPort = p.getUShort("sip_lport", d.sipLocalPort);
   cfg.rtpLocalPort = p.getUShort("rtp_port", d.rtpLocalPort);
@@ -136,6 +138,7 @@ bool validate(const Settings &s, String &err) {
   else if (s.sipUser.isEmpty() || s.sipUser.length() > 32) err = "SIP user must be 1-32 characters";
   else if (s.sipAuthUser.length() > 32) err = "SIP auth user too long";
   else if (s.sipPassword.length() > 64) err = "SIP password too long";
+  else if (s.otaPassword.length() && (s.otaPassword.length() < 8 || s.otaPassword.length() > 64)) err = "Update password must be empty (updates off) or 8-64 characters";
   else if (!s.sipServerPort || !s.sipLocalPort || !s.rtpLocalPort) err = "Ports must be 1-65535";
   else if (s.sipLocalPort == s.rtpLocalPort) err = "SIP and RTP local ports must differ";
   else if (s.sipExpires < 60 || s.sipExpires > 86400) err = "SIP expires must be 60-86400 s";
@@ -158,6 +161,7 @@ bool save(const Settings &s, String &err) {
   ok &= p.putString("sip_user", s.sipUser) == s.sipUser.length();
   p.putString("sip_auth", s.sipAuthUser);
   p.putString("sip_pass", s.sipPassword);
+  p.putString("ota_pass", s.otaPassword);
   ok &= p.putUShort("srv_port", s.sipServerPort) > 0;
   ok &= p.putUShort("sip_lport", s.sipLocalPort) > 0;
   ok &= p.putUShort("rtp_port", s.rtpLocalPort) > 0;
@@ -197,6 +201,7 @@ String toJson(const Settings &s) {
   j += ",\"sip_user\":" + escape(s.sipUser);
   j += ",\"sip_auth_user\":" + escape(s.sipAuthUser);
   j += ",\"sip_password_set\":" + String(s.sipPassword.length() ? "true" : "false");
+  j += ",\"ota_password_set\":" + String(s.otaPassword.length() ? "true" : "false");
   j += ",\"sip_expires\":" + String(s.sipExpires);
   j += ",\"sip_local_port\":" + String(s.sipLocalPort);
   j += ",\"rtp_local_port\":" + String(s.rtpLocalPort);
@@ -243,6 +248,7 @@ bool mergeJson(const String &json, Settings &s, String &err) {
     else if (key == "sip_user") ok = str(s.sipUser);
     else if (key == "sip_auth_user") ok = str(s.sipAuthUser);
     else if (key == "sip_password") ok = str(s.sipPassword);
+    else if (key == "ota_password") ok = str(s.otaPassword);
     else if (key == "sip_server_port") { if ((ok = num(1, 65535))) s.sipServerPort = n; }
     else if (key == "sip_local_port") { if ((ok = num(1, 65535))) s.sipLocalPort = n; }
     else if (key == "rtp_local_port") { if ((ok = num(1, 65535))) s.rtpLocalPort = n; }

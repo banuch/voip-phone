@@ -22,6 +22,7 @@ class PhoneConfig {
     this.sipUser = '',
     this.sipAuthUser = '',
     this.sipPasswordSet = false,
+    this.otaPasswordSet = false,
     this.sipExpires = 300,
     this.sipLocalPort = 5060,
     this.rtpLocalPort = 4000,
@@ -38,6 +39,7 @@ class PhoneConfig {
   final String sipUser;
   final String sipAuthUser;
   final bool sipPasswordSet;
+  final bool otaPasswordSet;
   final int sipExpires;
   final int sipLocalPort;
   final int rtpLocalPort;
@@ -57,6 +59,7 @@ class PhoneConfig {
       sipUser: s('sip_user'),
       sipAuthUser: s('sip_auth_user'),
       sipPasswordSet: j['sip_password_set'] == true,
+      otaPasswordSet: j['ota_password_set'] == true,
       sipExpires: n('sip_expires', 300),
       sipLocalPort: n('sip_local_port', 5060),
       rtpLocalPort: n('rtp_local_port', 4000),
@@ -77,6 +80,8 @@ class PhoneStatus {
     this.sip = '',
     this.sipDetail = '',
     this.call = '',
+    this.fw = '',
+    this.otaUrl = '',
     this.result = '',
     this.detail = '',
   });
@@ -88,6 +93,8 @@ class PhoneStatus {
   final String sip; // "registered" | "not registered"
   final String sipDetail;
   final String call;
+  final String fw; // firmware version
+  final String otaUrl; // http://<ip>/update when Wi-Fi updates are on
   final String result; // ready | saved | error | rebooting | reset
   final String detail;
 
@@ -102,6 +109,8 @@ class PhoneStatus {
         sip: (j['sip'] as String?) ?? '',
         sipDetail: (j['sip_detail'] as String?) ?? '',
         call: (j['call'] as String?) ?? '',
+        fw: (j['fw'] as String?) ?? '',
+        otaUrl: (j['ota_url'] as String?) ?? '',
         result: (j['result'] as String?) ?? '',
         detail: (j['detail'] as String?) ?? '',
       );

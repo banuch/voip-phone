@@ -1,6 +1,8 @@
 #include "ble_prov.h"
 #include "settings.h"
 #include "sip.h"
+#include "ota.h"
+#include "version.h"
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLESecurity.h>
@@ -96,6 +98,8 @@ String buildStatus() {
   s += ",\"sip\":\"" + String(sip::registered() ? "registered" : "not registered") + "\"";
   s += ",\"sip_detail\":\"" + jsonEscape(sip::lastError()) + "\"";
   s += ",\"call\":\"" + String(sip::callStateName()) + "\"";
+  s += ",\"fw\":\"" FW_VERSION "\"";
+  s += ",\"ota_url\":\"" + ota::url() + "\"";
   s += ",\"result\":\"" + result + "\"";
   s += ",\"detail\":\"" + jsonEscape(resultDetail) + "\"}";
   return s;

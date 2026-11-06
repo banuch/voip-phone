@@ -57,6 +57,7 @@ button:disabled{opacity:.45;cursor:default}
     <div class="stat"><b>IP address</b><span id="st-ip">-</span></div>
     <div class="stat"><b>SIP</b><span id="st-sip">-</span></div>
     <div class="stat"><b>Call</b><span id="st-call">-</span></div>
+    <div class="stat"><b>Firmware</b><span id="st-fw">-</span></div>
   </div>
   <p><small id="st-detail"></small></p>
 </section>
@@ -90,6 +91,15 @@ button:disabled{opacity:.45;cursor:default}
     <label>Speaker volume (%)<input name="speaker_volume" type="number" min="0" max="100" required></label>
     <label>Mic gain<input name="mic_gain" type="number" min="1" max="32" required></label>
   </div>
+</section>
+
+<section>
+  <h2>Firmware update over Wi-Fi</h2>
+  <div class="grid">
+    <label>Update password<input name="ota_password" type="password" minlength="8" maxlength="64" autocomplete="new-password"><small id="ota-pw-note"></small></label>
+  </div>
+  <p><label class="check"><input type="checkbox" id="ota_off"> Turn off updates over Wi-Fi</label></p>
+  <p><small id="ota-url">With a password set, open http://&lt;phone IP&gt;/update in a browser on the same network (user <b>admin</b>).</small></p>
 </section>
 
 <section>
@@ -136,6 +146,10 @@ function fill(cfg) {
   for (const k of NUMBERS) form.elements[k].value = cfg[k] ?? '';
   form.elements.wifi_password.value = '';
   form.elements.sip_password.value = '';
+  form.elements.ota_password.value = '';
+  form.elements.ota_password.disabled = false;
+  $('ota_off').checked = false;
+  $('ota-pw-note').textContent = cfg.ota_password_set ? 'Saved: updates on. Leave empty to keep it.' : 'Not set: updates off. 8-64 characters.';
   $('wifi-pw-note').textContent = cfg.wifi_password_set ? 'Saved. Leave empty to keep it. 2.4 GHz only.' : 'Not set. 2.4 GHz only.';
   $('sip-pw-note').textContent = cfg.sip_password_set ? 'Saved. Leave empty to keep it.' : 'Not set';
   $('wifi_open').checked = false;
@@ -147,6 +161,8 @@ function showStatus(s) {
   set('st-ip', s.ip);
   set('st-sip', s.sip, s.sip === 'registered' ? 'good' : s.configured ? 'warn' : 'bad');
   set('st-call', s.call);
+  set('st-fw', s.fw);
+  if (s.ota_url) $('ota-url').innerHTML = `Update page: <a href="${encodeURI(s.ota_url)}" target="_blank" rel="noopener">${s.ota_url.replace(/[<>&"]/g, '')}</a> (user <b>admin</b>)`;
   $('st-detail').textContent = s.sip_detail ? 'SIP: ' + s.sip_detail : '';
   if (s.result === 'error') say('Device rejected the settings: ' + s.detail, 'bad');
   else if (s.result === 'saved') { savedPending = true; say('Saved. The phone is restarting to apply them, and this page will reconnect...', 'good'); }
@@ -230,6 +246,8 @@ async function save(ev) {
     cfg.wifi_password = wpw;
   }
   if (form.elements.sip_password.value) cfg.sip_password = form.elements.sip_password.value;
+  if ($('ota_off').checked) cfg.ota_password = '';
+  else if (form.elements.ota_password.value) cfg.ota_password = form.elements.ota_password.value;
   if (cfg.sip_local_port === cfg.rtp_local_port) { say('SIP and RTP local ports must differ.', 'bad'); return; }
   try {
     $('save').disabled = true;
@@ -253,6 +271,7 @@ $('reset').onclick = async () => {
   if (!confirm('Erase all saved settings on the phone?')) return;
   try { await command('factory_reset'); } catch (e) { say(e.message, 'bad'); }
 };
+$('ota_off').onchange = e => { form.elements.ota_password.disabled = e.target.checked; };
 $('wifi_open').onchange = e => { form.elements.wifi_password.disabled = e.target.checked; };
 form.addEventListener('submit', save);
 if (!navigator.bluetooth) { $('unsupported').style.display = 'block'; $('connect').disabled = true; }

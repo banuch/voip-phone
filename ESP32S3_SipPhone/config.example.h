@@ -22,6 +22,9 @@
 #define SIP_LOCAL_PORT     5060             // UDP port the ESP32 listens on for SIP
 #define RTP_LOCAL_PORT     4000             // UDP port for call audio (RTP)
 
+// ---- Firmware update over Wi-Fi (http://<phone-ip>/update) ----
+#define OTA_PASSWORD       ""               // empty = updates off; else 8-64 chars
+
 // ---- Call handling ----
 #define AUTO_ANSWER_MS     1000             // -1 = answer manually only
 #define ANSWER_BUTTON_PIN  0                // BOOT: press = answer / hang up

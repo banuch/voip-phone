@@ -28,8 +28,10 @@ class _SetupScreenState extends State<SetupScreen> {
   final _expires = TextEditingController();
   final _sipLocal = TextEditingController();
   final _rtpLocal = TextEditingController();
+  final _otaPw = TextEditingController();
 
   bool _openWifi = false;
+  bool _otaOff = false;
   bool _autoAnswer = true;
   double _volume = 60;
   double _micGain = 4;
@@ -48,7 +50,7 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   void dispose() {
     s.removeListener(_onSession);
-    for (final c in [_ssid, _wifiPw, _server, _port, _user, _sipPw, _authUser, _domain, _answerMs, _expires, _sipLocal, _rtpLocal]) {
+    for (final c in [_ssid, _wifiPw, _server, _port, _user, _sipPw, _authUser, _domain, _answerMs, _expires, _sipLocal, _rtpLocal, _otaPw]) {
       c.dispose();
     }
     super.dispose();
@@ -80,6 +82,8 @@ class _SetupScreenState extends State<SetupScreen> {
     _expires.text = '${c.sipExpires}';
     _sipLocal.text = '${c.sipLocalPort}';
     _rtpLocal.text = '${c.rtpLocalPort}';
+    _otaPw.clear();
+    _otaOff = false;
   }
 
   Future<void> _save() async {
@@ -108,6 +112,11 @@ class _SetupScreenState extends State<SetupScreen> {
       values['wifi_password'] = _wifiPw.text;
     }
     if (_sipPw.text.isNotEmpty) values['sip_password'] = _sipPw.text;
+    if (_otaOff) {
+      values['ota_password'] = '';
+    } else if (_otaPw.text.isNotEmpty) {
+      values['ota_password'] = _otaPw.text;
+    }
     FocusScope.of(context).unfocus();
     await s.save(values);
   }
@@ -177,6 +186,8 @@ class _SetupScreenState extends State<SetupScreen> {
           _sipSection(editable),
           const SizedBox(height: 16),
           _audioSection(editable),
+          const SizedBox(height: 16),
+          _updateSection(editable),
           const SizedBox(height: 16),
           _advancedSection(editable),
           const SizedBox(height: 12),
@@ -388,6 +399,54 @@ class _SetupScreenState extends State<SetupScreen> {
         _text(_authUser, 'Auth user (optional)', enabled: enabled, maxLength: 32, hint: 'Same as extension'),
         _text(_domain, 'Domain (optional)', enabled: enabled, maxLength: 64, hint: 'Same as server'),
       ]),
+    );
+  }
+
+  Widget _updateSection(bool enabled) {
+    final cfg = s.config;
+    final t = Theme.of(context);
+    final url = s.status?.otaUrl ?? '';
+    return SectionCard(
+      icon: Icons.system_update_alt,
+      title: 'Firmware update over Wi-Fi',
+      subtitle: 'Upload a new .bin from a browser on the same network',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ResponsiveFields(children: [
+            _PasswordField(
+              controller: _otaPw,
+              label: 'Update password',
+              enabled: enabled && !_otaOff,
+              maxLength: 64,
+              helper: _otaOff
+                  ? 'Updates will be turned off'
+                  : cfg?.otaPasswordSet == true
+                      ? 'Saved: updates on. Leave empty to keep it.'
+                      : 'Not set: updates off',
+              validator: (v) {
+                if (_otaOff || v == null || v.isEmpty) return null;
+                if (v.length < 8) return 'At least 8 characters';
+                return null;
+              },
+            ),
+          ]),
+          const SizedBox(height: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _otaOff,
+            onChanged: enabled && cfg?.otaPasswordSet == true ? (v) => setState(() => _otaOff = v) : null,
+            title: const Text('Turn off updates over Wi-Fi'),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            url.isNotEmpty
+                ? 'Update page: $url (user admin)'
+                : 'With a password set, open http://<phone IP>/update in a browser (user admin).',
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 
@@ -642,6 +701,7 @@ class _StatusCard extends StatelessWidget {
       StatusTile(icon: Icons.lan_outlined, label: 'IP address', value: st?.ip ?? ''),
       StatusTile(icon: Icons.dialer_sip_outlined, label: 'SIP', value: st?.sip ?? '', tone: sipTone),
       StatusTile(icon: Icons.call_outlined, label: 'Call', value: st?.call ?? ''),
+      StatusTile(icon: Icons.memory_outlined, label: 'Firmware', value: st?.fw ?? ''),
     ];
     final t = Theme.of(context);
     return SectionCard(

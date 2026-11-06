@@ -5,6 +5,7 @@
 struct Settings {
   String wifiSsid, wifiPassword;
   String sipServer, sipDomain, sipUser, sipAuthUser, sipPassword;
+  String otaPassword;           // empty = Wi-Fi firmware update disabled
   uint16_t sipServerPort = 5060, sipLocalPort = 5060, rtpLocalPort = 4000;
   uint32_t sipExpires = 300;
   int32_t autoAnswerMs = 1000;  // -1 = manual answer only
