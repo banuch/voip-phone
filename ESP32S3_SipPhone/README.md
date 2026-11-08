@@ -6,14 +6,24 @@ Wiring is identical to `ESP32S3_AudioWebTest` (GPIO4 BCLK, GPIO5 WS, GPIO6 mic S
 
 ## Build and flash
 
-From the repository root:
+**Over the UART serial port** (the board's USB-to-serial chip, CH340 / CP210x, connector usually marked *UART* or *COM*), use the sketch's own script:
+
+```powershell
+.\ESP32S3_SipPhone\build.bat COM9            # compile, upload, monitor
+.\ESP32S3_SipPhone\build.bat compile         # compile only
+.\ESP32S3_SipPhone\build.bat COM9 monitor    # Serial Monitor only
+```
+
+Without a port it picks the only USB-to-serial port that isn't the ESP32-S3's native USB. It builds with *USB CDC On Boot: Disabled*, so `Serial` goes to UART0 (GPIO43/44) and the log appears on that port. It uploads at 921600 baud; set `$env:SIP_UPLOAD_SPEED='115200'` if uploads fail. Set `$env:SIP_FQBN` to override the board options, for example for a 4 MB module without PSRAM (see the comments in the script).
+
+**Over the native USB port**, use the repository-root script:
 
 ```powershell
 $env:AUDIO_SKETCH='ESP32S3_SipPhone'
 .\build.bat COM5
 ```
 
-`build.bat` selects the **Minimal SPIFFS (1.9 MB APP with OTA)** partition scheme for this sketch, because Wi-Fi plus Bluetooth needs more than the default 1.2 MB app slot leaves spare. In the Arduino IDE choose Tools > Partition Scheme > *Minimal SPIFFS*. Any module with at least 4 MB flash works.
+Both scripts select the **Minimal SPIFFS (1.9 MB APP with OTA)** partition scheme for this sketch, because Wi-Fi plus Bluetooth needs more than the default 1.2 MB app slot leaves spare. In the Arduino IDE choose Tools > Partition Scheme > *Minimal SPIFFS*. Any module with at least 4 MB flash works.
 
 ## Set it up over Bluetooth
 
@@ -105,13 +115,23 @@ qualify_frequency=30
 | `]` / `[` | Mic gain ±1 (saved) |
 | `X` | Factory reset |
 
+## Voice prompts
+
+The speaker says **"Wi-Fi connected"** when Wi-Fi joins and **"SIP phone connected successfully"** when SIP registration succeeds. Both play again after a reconnect, but not on the routine re-registrations. They follow the speaker volume. A call cuts a prompt off, and a prompt plays before the ring tone.
+
+The sounds are built into the firmware. Each one is a 16-bit PCM array in `prompts.h`, about 93 KB together. A firmware update over Wi-Fi updates them too, and no filesystem is needed. To change them:
+
+1. Replace `prompts/wifi_connected.wav` or `prompts/sip_connected.wav` with your own recording: **16 kHz, mono, 16-bit PCM WAV**, up to 4 seconds. Or delete a WAV to have Windows text-to-speech speak it again.
+2. From the repository root run `python tools/make_prompts.py`. Add `--tts` to re-speak both with text-to-speech. The script trims the silence at each end and rewrites `prompts.h`.
+3. Rebuild and flash.
+
 ## How it works
 
 - `settings.cpp`: settings in NVS (`Preferences`, namespace `sipphone`), validation, and the JSON used over Bluetooth.
 - `ble_prov.cpp`: the setup-mode GATT service (NimBLE). Writes arrive in the BLE task and are applied by the main loop.
 - `sip.cpp`: a small SIP UA over UDP. It handles REGISTER with MD5 digest auth and refreshes it before expiry, then INVITE → 100/180/200, ACK, CANCEL (487), BYE, re-INVITE (hold, media change), OPTIONS and NOTIFY. One call at a time; a second INVITE gets 486 Busy.
 - `ota.cpp`: the web server on port 80 for firmware updates (`WebServer` + `Update`), and the post-update check that keeps or rolls back a new image.
-- `audio.cpp`: one full-duplex I2S port at 16 kHz/32-bit, in a FreeRTOS task on core 1. The mic path applies a DC blocker and gain, then halfband decimation to 8 kHz and G.711 (PCMU/PCMA), sent as 20 ms RTP packets. The receive path runs through a 60 ms jitter buffer, G.711 decode, interpolation to 16 kHz and volume control before reaching the speaker.
+- `audio.cpp`: one full-duplex I2S port at 16 kHz/32-bit, in a FreeRTOS task on core 1. The mic path applies a DC blocker and gain, then halfband decimation to 8 kHz and G.711 (PCMU/PCMA), sent as 20 ms RTP packets. The receive path runs through a 60 ms jitter buffer, G.711 decode, interpolation to 16 kHz and volume control before reaching the speaker. When no call is active, the same task plays the queued voice prompts from `prompts.h` straight to the speaker, or the ring tone.
 
 ## Limitations
 

@@ -5,9 +5,11 @@
 //           -> volume -> I2S TX -> MAX98357A
 // One I2S port drives both directions on shared BCLK/WS, so mic reads and
 // speaker writes are paced by the same clock.
+// Speaker priority: call audio > voice prompt > ring tone.
 #include "audio.h"
 #include "app_config.h"
 #include "settings.h"
+#include "prompts.h"
 #include <ESP_I2S.h>
 #include <WiFiUdp.h>
 #include <math.h>
@@ -32,6 +34,11 @@ struct Pending {
   uint8_t pt = 0;
 } pending;
 volatile bool ringing = false;
+
+// Voice prompts: a small FIFO filled by the loop task, drained by the audio task.
+constexpr size_t PROMPT_QUEUE = 4;
+uint8_t promptQueue[PROMPT_QUEUE];
+size_t promptHead = 0, promptCount = 0;  // guarded by lock
 volatile int volumePct = 60;  // set from settings in audio::begin()
 volatile int gain = 4;
 audio::Stats st = {};
@@ -58,6 +65,9 @@ uint8_t rxPkt[1500];
 int32_t dcX = 0, dcY = 0;
 float tonePhase = 0;
 uint32_t frameCount = 0;
+const int16_t *promptPcm = nullptr;  // prompt now playing, nullptr when none
+size_t promptLen = 0, promptPos = 0;
+uint32_t promptGap = 0;              // silent frames left before the next prompt
 
 // ---- Jitter buffer (8 kHz samples) ----
 constexpr size_t JB_CAP = 4096;            // 512 ms
@@ -200,9 +210,46 @@ void handleRtp(const uint8_t *p, int len) {
   for (int i = off; i < end; i++) jbPush(payloadType == 8 ? alawToLinear(p[i]) : ulawToLinear(p[i]));
 }
 
+// ---- Voice prompts ----
+void clearPrompts() {
+  portENTER_CRITICAL(&lock);
+  promptCount = 0;
+  portEXIT_CRITICAL(&lock);
+  promptPcm = nullptr;
+  promptGap = 0;
+}
+
+// Fills spk16 with the next 20 ms of a prompt; false when none is playing.
+bool producePrompt() {
+  if (!promptPcm) {
+    if (promptGap) { promptGap--; return false; }
+    bool got = false;
+    uint8_t id = 0;
+    portENTER_CRITICAL(&lock);
+    if (promptCount) {
+      id = promptQueue[promptHead];
+      promptHead = (promptHead + 1) % PROMPT_QUEUE;
+      promptCount--;
+      got = true;
+    }
+    portEXIT_CRITICAL(&lock);
+    if (!got) return false;
+    if (id == audio::PROMPT_WIFI_CONNECTED) { promptPcm = PROMPT_WIFI_PCM; promptLen = sizeof(PROMPT_WIFI_PCM) / 2; }
+    else { promptPcm = PROMPT_SIP_PCM; promptLen = sizeof(PROMPT_SIP_PCM) / 2; }
+    promptPos = 0;
+  }
+  size_t n = min(FRAME16, promptLen - promptPos);
+  memcpy(spk16, promptPcm + promptPos, n * 2);
+  if (n < FRAME16) memset(spk16 + n, 0, (FRAME16 - n) * 2);
+  promptPos += n;
+  if (promptPos >= promptLen) { promptPcm = nullptr; promptGap = 15; }  // 300 ms between prompts
+  return true;
+}
+
 // ---- Speaker ----
 void producePlayout() {
   if (active) {
+    if (promptPcm || promptCount) clearPrompts();  // a call cancels prompts
     int16_t *s = usBuf + 3;
     jbPop(s, FRAME8);
     // 4-point halfband interpolation to 16 kHz (one sample of delay).
@@ -212,6 +259,8 @@ void producePlayout() {
       spk16[2 * n + 1] = clamp16((-a[0] + 9 * a[1] + 9 * a[2] - a[3]) / 16);
     }
     memmove(usBuf, usBuf + FRAME8, 3 * sizeof(int16_t));
+  } else if (producePrompt()) {
+    // spk16 holds prompt audio
   } else if (ringing && (frameCount % 200) < 50) {  // 1 s on, 3 s off
     const float step = 2.0f * float(M_PI) * 425.0f / I2S_RATE;
     for (size_t i = 0; i < FRAME16; i++) {
@@ -293,6 +342,15 @@ bool begin() {
 }
 
 void setRinging(bool on) { ringing = on; }
+
+void playPrompt(Prompt p) {
+  portENTER_CRITICAL(&lock);
+  bool queued = false;
+  for (size_t i = 0; i < promptCount; i++)
+    if (promptQueue[(promptHead + i) % PROMPT_QUEUE] == p) queued = true;
+  if (!queued && promptCount < PROMPT_QUEUE) promptQueue[(promptHead + promptCount++) % PROMPT_QUEUE] = p;
+  portEXIT_CRITICAL(&lock);
+}
 
 void startCall(IPAddress ip, uint16_t port, uint8_t pt) {
   portENTER_CRITICAL(&lock);

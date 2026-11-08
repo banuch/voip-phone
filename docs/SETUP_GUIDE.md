@@ -217,6 +217,23 @@ Open the firewall if one is active (UFW example):
 sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp
 ```
 
+**WSL2 in mirrored mode:** WSL has its own Hyper-V firewall, separate from the normal Windows Firewall rules, and it blocks incoming traffic by default. Allow SIP and RTP from your LAN in an **administrator** PowerShell. Replace `192.168.1.0/24` with your own subnet: take the PC's IPv4 address from `ipconfig` and change the last number to `0/24`. If the subnet is wrong, Asterisk never sees the phone and the phone logs `registration failed: no response`.
+
+```powershell
+$wsl = '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'
+New-NetFirewallHyperVRule -Name WSL-Asterisk-SIP -DisplayName "WSL Asterisk SIP UDP 5060" -Direction Inbound -VMCreatorId $wsl -Protocol UDP -LocalPorts 5060 -RemoteAddresses 192.168.1.0/24 -Action Allow
+New-NetFirewallHyperVRule -Name WSL-Asterisk-RTP -DisplayName "WSL Asterisk RTP Audio" -Direction Inbound -VMCreatorId $wsl -Protocol UDP -LocalPorts 10000-20000 -RemoteAddresses 192.168.1.0/24 -Action Allow
+```
+
+Check them with `Get-NetFirewallHyperVRule -VMCreatorId $wsl | Where-Object Name -like 'WSL-Asterisk*' | Format-Table Name,LocalPorts,RemoteAddresses,Enabled`. If the rules already exist with the wrong subnet or port range, fix them in place:
+
+```powershell
+Set-NetFirewallHyperVRule -Name WSL-Asterisk-SIP,WSL-Asterisk-RTP -RemoteAddresses 192.168.1.0/24
+Set-NetFirewallHyperVRule -Name WSL-Asterisk-RTP -LocalPorts 10000-20000
+```
+
+To test from another device, not the PC itself: in mirrored mode the PC can't reach WSL on its own LAN IP unless `hostAddressLoopback=true` is set in `.wslconfig`.
+
 ### 4.4 Check it is running
 
 ```bash
@@ -509,7 +526,7 @@ Pairing is "Just Works" with LE Secure Connections: the link is encrypted but th
 | Save shows an error | Read the message: it is the firmware's validation (e.g. Wi-Fi password must be 8–63 chars). |
 | `[WIFI]` never connects | 2.4 GHz only; check SSID/password; guest networks with client isolation block SIP. |
 | `cannot resolve <server>` | Use the server's IP instead of a hostname. |
-| `registration failed: no response` | Wrong server IP/port; Asterisk not running; firewall on UDP 5060; WSL2 in NAT mode. Check `pjsip show transports`. |
+| `registration failed: no response` | Wrong server IP/port; Asterisk not running; firewall on UDP 5060; WSL2 in NAT mode; WSL Hyper-V firewall rule limited to the wrong subnet (see §4.3). Check `pjsip show transports`. |
 | Repeated `401 Unauthorized` | Password or auth user doesn't match `pjsip.conf` `[1001]` auth section. |
 | Call rejected: no PCMU/PCMA | Add `allow=ulaw,alaw` to both endpoints. |
 | Connected but one-way or no audio | Run `s` during the call: `rx=0` means no RTP arriving. Set `direct_media=no`, `rtp_symmetric=yes`; open the RTP range on the server firewall. |

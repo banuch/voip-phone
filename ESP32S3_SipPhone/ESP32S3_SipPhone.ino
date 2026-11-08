@@ -9,6 +9,9 @@
 // Firmware updates over Wi-Fi: http://<phone-ip>/update once an update
 // password is set over Bluetooth (see ota.h).
 //
+// Voice prompts "Wi-Fi connected" and "SIP phone connected successfully" are
+// built into the firmware; tools/make_prompts.py regenerates prompts.h.
+//
 // BOOT button: press = answer when ringing, otherwise hang up.
 // Serial commands (115200 baud):
 //   a = answer   h = hang up / decline   s = status   r = re-register
@@ -75,8 +78,21 @@ void reportWifi() {
   static wl_status_t last = WL_IDLE_STATUS;
   wl_status_t now = WiFi.status();
   if (now == last) return;
-  if (now == WL_CONNECTED) Serial.printf("[WIFI] connected, IP %s, RSSI %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
-  else if (last == WL_CONNECTED) Serial.println("[WIFI] disconnected, reconnecting...");
+  if (now == WL_CONNECTED) {
+    Serial.printf("[WIFI] connected, IP %s, RSSI %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    audio::playPrompt(audio::PROMPT_WIFI_CONNECTED);
+  } else if (last == WL_CONNECTED) {
+    Serial.println("[WIFI] disconnected, reconnecting...");
+  }
+  last = now;
+}
+
+// Says "SIP phone connected successfully" when registration is gained, not on
+// the periodic re-registrations that keep it alive.
+void reportSip() {
+  static bool last = false;
+  bool now = sip::registered();
+  if (now && !last) audio::playPrompt(audio::PROMPT_SIP_CONNECTED);
   last = now;
 }
 
@@ -111,6 +127,7 @@ void loop() {
   handleSerial();
   handleButton();
   sip::loop();
+  reportSip();
   ble_prov::loop();
   ota::loop();
   delay(1);

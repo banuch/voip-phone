@@ -16,8 +16,12 @@ struct Stats {
   int micPeak;            // 0..32767 over the last frame
 };
 
+// Spoken status prompts, built into the firmware (see prompts.h).
+enum Prompt : uint8_t { PROMPT_WIFI_CONNECTED, PROMPT_SIP_CONNECTED };
+
 bool begin();                                                    // start I2S + audio task
 void setRinging(bool on);                                        // local ring tone on speaker
+void playPrompt(Prompt p);  // queue a prompt; plays when no call is active, after earlier prompts
 void startCall(IPAddress ip, uint16_t port, uint8_t payloadType); // open or retarget RTP
 void stopCall();
 void setVolume(int percent);
