@@ -6,8 +6,8 @@
 #include <ESP_I2S.h>
 #include <esp_heap_caps.h>
 
-const char *WIFI_SSID = "Sahasra";
-const char *WIFI_PASSWORD = "wintek@143";
+const char *WIFI_SSID = "sarath office";
+const char *WIFI_PASSWORD = "sarath143";
 constexpr int BCLK_PIN = 4, WS_PIN = 5, MIC_PIN = 6, SPEAKER_PIN = 7;
 constexpr uint32_t RATE = 16000, MAX_DATA = RATE * 2 * 10;
 constexpr size_t MAX_UPLOAD = MAX_DATA + 4096;

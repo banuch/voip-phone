@@ -1,0 +1,8 @@
+# ESP32S3_AudioWebTest partition table. Fits 4 MB flash and larger.
+# No OTA: one 2 MB app slot (sketch is ~1 MB), the rest goes to LittleFS.
+# LittleFS.begin() mounts the partition labelled "spiffs".
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs,      data, nvs,      0x9000,   0x5000,
+factory,  app,  factory,  0x10000,  0x200000,
+spiffs,   data, spiffs,   0x210000, 0x1E0000,
+coredump, data, coredump, 0x3F0000, 0x10000,
