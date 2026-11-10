@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Command-center palette. Dark navy/charcoal base tuned for long shifts:
+ * low-luminance surfaces, no pure white text, status colours reserved for
+ * meaning (green = online/available, amber = warning, red = critical/offline,
+ * blue = primary action/info).
+ */
+:root {
+  --background: 222 47% 6%;
+  --surface: 221 42% 9%;
+  --card: 220 38% 11%;
+  --elevated: 219 34% 15%;
+  --border: 218 30% 20%;
+  --input: 218 30% 22%;
+  --ring: 213 94% 62%;
+  --foreground: 214 32% 91%;
+  --muted: 216 18% 63%;
+  --subtle: 217 16% 44%;
+  --primary: 213 94% 58%;
+  --primary-foreground: 222 47% 8%;
+  --success: 145 63% 46%;
+  --success-foreground: 145 80% 8%;
+  --warning: 38 92% 54%;
+  --warning-foreground: 38 90% 10%;
+  --danger: 0 78% 60%;
+  --danger-foreground: 0 0% 100%;
+  --info: 191 85% 52%;
+  --info-foreground: 191 90% 8%;
+  --neutral: 217 14% 52%;
+  color-scheme: dark;
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'tnum';
+  }
+  ::selection { background: hsl(var(--primary) / 0.35); }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; border: 2px solid hsl(var(--surface)); }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer components {
+  .num { font-variant-numeric: tabular-nums; }
+  .panel { @apply rounded-lg border bg-card; }
+  .grid-bg {
+    background-image: linear-gradient(hsl(var(--border) / 0.25) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.25) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

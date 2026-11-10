@@ -1,0 +1,117 @@
+# Development / single-server stack. From wintek-sip-command-center/:
+#   docker compose -f infra/docker-compose.yml up -d postgres redis      # data services only (dev)
+#   docker compose -f infra/docker-compose.yml --profile full up -d      # + API, dashboard, Asterisk, TURN
+#   docker compose -f infra/docker-compose.yml --profile stage2 up -d    # + Kamailio registrar
+#   docker compose -f infra/docker-compose.yml --profile monitoring up -d
+# Secrets come from infra/.env (copy infra/.env.example). Never commit .env.
+
+name: wintek
+
+x-api-env: &api-env
+  NODE_ENV: ${NODE_ENV:-development}
+  DATABASE_URL: postgres://wintek:${POSTGRES_PASSWORD:-wintek}@postgres:5432/wintek
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-dev-only-secret-change-me}
+  INTERNAL_WEBHOOK_SECRET: ${INTERNAL_WEBHOOK_SECRET:-dev-internal-secret}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,https://localhost}
+  SIP_DRIVER: ${SIP_DRIVER:-ari}
+  ARI_URL: http://host.docker.internal:8088/ari
+  ARI_USER: wintek
+  ARI_PASSWORD: ${ARI_PASSWORD:-wintek-ari}
+  MEDIA_NODE_ID: asterisk-1
+  ATM_DIAL_MODE: ${ATM_DIAL_MODE:-asterisk-registrar}
+  SIP_DOMAIN: ${SIP_DOMAIN:-sip.wintek.local}
+  SIP_REALM: ${SIP_DOMAIN:-sip.wintek.local}
+  WEBRTC_WSS_URL: ${WEBRTC_WSS_URL:-wss://localhost:8089/ws}
+  TURN_URL: ${TURN_URL:-}
+  TURN_SECRET: ${TURN_SECRET:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wintek
+      POSTGRES_USER: wintek
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wintek}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U wintek"], interval: 5s, retries: 10 }
+
+  redis:
+    image: redis:7-alpine
+    # Transient data only (fan-out, sequences, replay buffer): no persistence needed.
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10 }
+
+  api:
+    profiles: [full, stage2]
+    build: { context: .., dockerfile: apps/api/Dockerfile }
+    environment: *api-env
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # Stateless: background jobs elect a runner per tick via PostgreSQL advisory locks.
+    deploy: { replicas: 2 }
+
+  dashboard:
+    profiles: [full, stage2]
+    build: { context: .., dockerfile: apps/dashboard/Dockerfile }
+    ports: ["80:80", "443:443"]
+    volumes: ["./tls:/etc/nginx/tls:ro"]
+    depends_on: [api]
+
+  asterisk:
+    profiles: [full, stage2]
+    image: ${ASTERISK_IMAGE:-andrius/asterisk:20}
+    # Host networking keeps the RTP range (10000-20000/udp) simple and correct on Linux.
+    network_mode: host
+    environment:
+      EXTERNAL_IP: ${EXTERNAL_IP:-127.0.0.1}
+      ARI_PASSWORD: ${ARI_PASSWORD:-wintek-ari}
+      ASTERISK_DB_PASSWORD: ${ASTERISK_DB_PASSWORD:-asterisk}
+      STUN_HOST: ${STUN_HOST:-stun.l.google.com:19302}
+    volumes:
+      - ./asterisk:/etc/asterisk/templates:ro
+      - ./tls:/etc/asterisk/keys:ro
+    entrypoint: ["/bin/sh", "/etc/asterisk/templates/docker-entrypoint.sh"]
+
+  kamailio:
+    profiles: [stage2]
+    image: ghcr.io/kamailio/kamailio:5.8.4-bookworm
+    ports: ["5060:5060/udp", "5060:5060/tcp"]
+    volumes: ["./kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro"]
+    depends_on: [postgres, api]
+
+  coturn:
+    profiles: [full, stage2]
+    image: coturn/coturn:4.6
+    network_mode: host
+    command: ["-n", "--use-auth-secret", "--static-auth-secret=${TURN_SECRET:-dev-turn-secret}", "--realm=${SIP_DOMAIN:-sip.wintek.local}", "--no-cli", "--fingerprint"]
+
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v2.55.1
+    volumes: ["./prometheus:/etc/prometheus:ro"]
+    ports: ["127.0.0.1:9090:9090"]
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:11.3.1
+    volumes: ["./grafana/provisioning:/etc/grafana/provisioning:ro"]
+    ports: ["127.0.0.1:3001:3000"]
+
+  postgres-exporter:
+    profiles: [monitoring]
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    environment: { DATA_SOURCE_NAME: "postgresql://wintek:${POSTGRES_PASSWORD:-wintek}@postgres:5432/wintek?sslmode=disable" }
+
+  redis-exporter:
+    profiles: [monitoring]
+    image: oliver006/redis_exporter:v1.66.0
+    environment: { REDIS_ADDR: "redis://redis:6379" }
+
+volumes:
+  pgdata:
