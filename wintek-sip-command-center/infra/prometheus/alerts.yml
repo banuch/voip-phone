@@ -1,0 +1,24 @@
+groups:
+  - name: wintek
+    rules:
+      - alert: ApiDown
+        expr: up{job="wintek-api"} == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: BackgroundJobFailing
+        expr: increase(wintek_worker_runs_total{outcome="error"}[10m]) > 0
+        labels: { severity: warning }
+        annotations: { summary: "Background job {{ $labels.task }} is failing (timeouts/queue/presence sweeps may be stalled)" }
+      - alert: OnlineAtmsDropped
+        expr: (wintek_online_atms - wintek_online_atms offset 10m) / clamp_min(wintek_online_atms offset 10m, 1) < -0.05
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "More than 5% of ATM intercoms went offline within 10 minutes (network or registrar outage?)" }
+      - alert: NoAvailableOperators
+        expr: wintek_available_operators == 0
+        for: 5m
+        labels: { severity: warning }
+      - alert: QueueBacklog
+        expr: wintek_queue_depth > 10
+        for: 5m
+        labels: { severity: warning }

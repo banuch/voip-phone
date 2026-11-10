@@ -10,7 +10,7 @@ import { conflict, notFound } from '../../common/http/errors';
 import { offset, orderBy, type Page } from '../../common/http/pagination';
 import { AuditService } from '../audit/audit.service';
 import { EventBusService } from '../realtime/event-bus.service';
-import { OPERATOR_AUTHORIZED_FOR_ATM_SQL } from '../assignments/authorization.sql';
+import { ATMS_AUTHORIZED_FOR_OPERATOR_SQL } from '../assignments/authorization.sql';
 import { SipIdentityService, atmSipUsername, type IssuedSipCredential } from './sip-identity.service';
 import { parseCsvObjects } from './csv';
 import type { AtmListQuery, BulkAtmDto, CreateAtmDto, UpdateAtmDto } from './atms.dto';
@@ -102,7 +102,7 @@ export class AtmsService {
     if (q.mine) {
       if (!user.operatorId) w.add('false');
       else {
-        const frag = OPERATOR_AUTHORIZED_FOR_ATM_SQL('?::uuid', 'd.id');
+        const frag = ATMS_AUTHORIZED_FOR_OPERATOR_SQL('?::uuid', 'd.id', 'd.region_id');
         w.add(frag, ...Array<string>(frag.split('?').length - 1).fill(user.operatorId));
       }
     }

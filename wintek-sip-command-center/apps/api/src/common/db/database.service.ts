@@ -75,6 +75,41 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Long-lived leadership (e.g. "this node consumes ARI events for media node X").
+   * Holds a dedicated connection with a session advisory lock. `alive()` checks
+   * the connection still works; if it fails the lock is gone (PostgreSQL
+   * released it with the session) and the caller must step down.
+   */
+  async holdLeadership(key: number): Promise<{ alive: () => Promise<boolean>; release: () => Promise<void> } | null> {
+    const c = await this.pool.connect();
+    let ok = false;
+    try {
+      ok = !!(await c.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [key])).rows[0]?.ok;
+    } finally {
+      if (!ok) c.release();
+    }
+    if (!ok) return null;
+    let broken = false;
+    c.on('error', () => (broken = true));
+    return {
+      alive: async () => {
+        if (broken) return false;
+        try {
+          await c.query('SELECT 1');
+          return true;
+        } catch {
+          broken = true;
+          return false;
+        }
+      },
+      release: async () => {
+        await c.query('SELECT pg_advisory_unlock($1)', [key]).catch(() => undefined);
+        c.release(broken);
+      },
+    };
+  }
+
   async ping(): Promise<number> {
     const t = Date.now();
     await this.pool.query('SELECT 1');

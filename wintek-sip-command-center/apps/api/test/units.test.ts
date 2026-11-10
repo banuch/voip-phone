@@ -39,7 +39,8 @@ describe('sip credentials', () => {
     expect(new Set(Array.from({ length: 50 }, () => generateSipPassword())).size).toBe(50);
   });
   it('derives device usernames', () => {
-    expect(atmSipUsername('ATM-MH_001')).toBe('atm-atm-mh-001');
+    expect(atmSipUsername('ATM-MH_001')).toBe('atm-mh-001');
+    expect(atmSipUsername('BR7-0042')).toBe('atm-br7-0042');
   });
 });
 

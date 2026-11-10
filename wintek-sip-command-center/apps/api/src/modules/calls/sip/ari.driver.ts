@@ -54,6 +54,7 @@ export class AriSipDriver implements SipDriver {
 
   async start(onSignal: (s: SipSignal) => void) {
     this.emit = onSignal;
+    this.stopping = false; // restartable: leadership may move away and come back
     this.openEvents();
   }
 

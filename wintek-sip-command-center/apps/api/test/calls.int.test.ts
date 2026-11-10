@@ -196,4 +196,17 @@ describeDb('call control (integration)', () => {
     const h = await pool.query(`SELECT dial_token_hash FROM call_sessions WHERE id = $1`, [s.id]);
     expect(h.rows[0].dial_token_hash).toBeNull();
   });
+  it('"My ATMs" list and call authorization agree', async () => {
+    const r = await http().get('/api/v1/atms?mine=true&pageSize=500').set('Authorization', `Bearer ${tokens[1]}`);
+    const ids = new Set(r.body.items.map((a: any) => a.id));
+    for (const id of [...f.atms, f.offlineAtm]) expect(ids.has(id)).toBe(true);
+    expect(ids.has(f.otherRegionAtm)).toBe(false);
+    expect((await initiate(tokens[1]!, { atmId: f.otherRegionAtm })).body.code).toBe('NOT_AUTHORIZED');
+    // A static assignment outside the region grants both.
+    await pool.query(`UPDATE atm_assignments SET backup_operator_id = $2 WHERE atm_id = $1`, [f.otherRegionAtm, f.operators[1]!.operatorId]);
+    const r2 = await http().get('/api/v1/atms?mine=true&pageSize=500').set('Authorization', `Bearer ${tokens[1]}`);
+    expect(r2.body.items.some((a: any) => a.id === f.otherRegionAtm)).toBe(true);
+    expect((await initiate(tokens[1]!, { atmId: f.otherRegionAtm })).status).toBe(200);
+    await pool.query(`UPDATE atm_assignments SET backup_operator_id = NULL WHERE atm_id = $1`, [f.otherRegionAtm]);
+  });
 });

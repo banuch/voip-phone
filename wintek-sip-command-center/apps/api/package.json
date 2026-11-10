@@ -11,7 +11,9 @@
     "db:migrate": "ts-node --transpile-only src/common/db/migrate.ts",
     "db:seed": "ts-node --transpile-only src/seed.ts",
     "openapi": "ts-node --transpile-only src/openapi-export.ts",
-    "test": "jest"
+    "test": "jest",
+    "sim:devices": "ts-node --transpile-only scripts/device-simulator.ts",
+    "smoke": "bash scripts/smoke.sh"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.7",

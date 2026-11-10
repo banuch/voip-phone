@@ -103,14 +103,53 @@ export class CallsService implements OnModuleInit, OnModuleDestroy {
     @Inject(SIP_DRIVER) private readonly driver: SipDriver,
   ) {}
 
+  private leadershipTimer?: NodeJS.Timeout;
+  private leadership: { alive: () => Promise<boolean>; release: () => Promise<void> } | null = null;
+
   async onModuleInit() {
+    if (this.driver.name !== 'ari') {
+      await this.startDriver(); // simulator: in-process, single node
+      return;
+    }
+    // Exactly one API node per media node consumes ARI events; otherwise two
+    // nodes would both act on the same StasisStart. Every node can still send
+    // ARI REST commands (hangup etc.). If the leader dies its DB session ends,
+    // the lock is released and another node takes over within ~5 s.
+    const key = 7300300 + (Array.from(this.driver.node).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 0) & 0xffff);
+    const tick = async () => {
+      try {
+        if (this.leadership) {
+          if (!(await this.leadership.alive())) {
+            this.log.error(`lost ARI leadership for ${this.driver.node}; stopping event consumer`);
+            this.leadership = null;
+            await this.driver.stop();
+          }
+          return;
+        }
+        const l = await this.db.holdLeadership(key);
+        if (l) {
+          this.leadership = l;
+          this.log.log(`this node consumes ARI events for ${this.driver.node}`);
+          await this.startDriver();
+        }
+      } catch (e: any) {
+        this.log.warn(`ARI leadership check failed: ${e.message}`);
+      }
+    };
+    await tick();
+    this.leadershipTimer = setInterval(() => void tick(), 5_000);
+  }
+
+  private async startDriver() {
     await this.driver.start((s) => {
       void this.onSignal(s).catch((e) => this.log.error(`signal ${s.type} failed: ${e.message}`, e.stack));
     });
   }
 
   async onModuleDestroy() {
+    clearInterval(this.leadershipTimer);
     await this.driver.stop();
+    await this.leadership?.release();
   }
 
   // =============================================================== initiate

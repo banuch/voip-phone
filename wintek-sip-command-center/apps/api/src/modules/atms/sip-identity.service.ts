@@ -28,7 +28,10 @@ export function generateSipPassword(len = 24): string {
 export const sipHa1 = (username: string, realm: string, password: string) =>
   createHash('md5').update(`${username}:${realm}:${password}`).digest('hex');
 
-export const atmSipUsername = (atmCode: string) => `atm-${atmCode.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+export const atmSipUsername = (atmCode: string) => {
+  const c = atmCode.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return c.startsWith('atm-') ? c : `atm-${c}`;
+};
 export const operatorSipUsername = (username: string) => `op-${username.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
 
 /**

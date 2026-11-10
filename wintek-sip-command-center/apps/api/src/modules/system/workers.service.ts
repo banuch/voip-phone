@@ -23,8 +23,8 @@ export interface JobStatus {
   skippedNotLeader: number;
 }
 
-const jobRuns = new Counter({ name: 'wintek_worker_runs_total', help: 'Background job runs', labelNames: ['job', 'outcome'] });
-const jobDuration = new Histogram({ name: 'wintek_worker_duration_seconds', help: 'Background job duration', labelNames: ['job'], buckets: [0.01, 0.05, 0.1, 0.5, 1, 5] });
+const jobRuns = new Counter({ name: 'wintek_worker_runs_total', help: 'Background job runs', labelNames: ['task', 'outcome'] });
+const jobDuration = new Histogram({ name: 'wintek_worker_duration_seconds', help: 'Background job duration', labelNames: ['task'], buckets: [0.01, 0.05, 0.1, 0.5, 1, 5] });
 export const activeCallsGauge = new Gauge({ name: 'wintek_active_calls', help: 'Calls in an active state' });
 export const onlineAtmsGauge = new Gauge({ name: 'wintek_online_atms', help: 'ATMs with a live SIP registration' });
 export const availableOperatorsGauge = new Gauge({ name: 'wintek_available_operators', help: 'Operators effectively AVAILABLE' });
@@ -53,7 +53,8 @@ export class WorkersService implements OnApplicationBootstrap, OnModuleDestroy {
   private jobs(): Job[] {
     return [
       { name: 'call-timeouts', everyMs: 2_000, lockKey: 7300101, run: () => this.sweeper.sweepTimeouts() },
-      { name: 'media-reconcile', everyMs: 30_000, lockKey: 7300102, run: () => this.sweeper.reconcileMedia() },
+      // Per media node: only the node consuming that node's ARI events can see its channels (others no-op).
+      { name: 'media-reconcile', everyMs: 30_000, lockKey: 0, run: () => this.sweeper.reconcileMedia() },
       { name: 'presence-stale', everyMs: 5_000, lockKey: 7300103, run: () => this.presence.sweepStale() },
       { name: 'registration-stale', everyMs: 60_000, lockKey: 7300104, run: () => this.devices.sweepStaleRegistrations() },
       { name: 'queue-dispatch', everyMs: 2_000, lockKey: 7300201, run: () => this.queue.dispatch() },
@@ -88,14 +89,14 @@ export class WorkersService implements OnApplicationBootstrap, OnModuleDestroy {
         return;
       }
       const t = Date.now();
-      const end = jobDuration.startTimer({ job: j.name });
+      const end = jobDuration.startTimer({ task: j.name });
       try {
         await j.run();
         st.lastError = null;
-        jobRuns.inc({ job: j.name, outcome: 'ok' });
+        jobRuns.inc({ task: j.name, outcome: 'ok' });
       } catch (e: any) {
         st.lastError = e.message;
-        jobRuns.inc({ job: j.name, outcome: 'error' });
+        jobRuns.inc({ task: j.name, outcome: 'error' });
         this.log.error(`job ${j.name} failed: ${e.message}`);
       } finally {
         end();

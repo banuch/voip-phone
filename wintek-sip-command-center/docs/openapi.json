@@ -1,0 +1,3313 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "Action prefix, e.g. \"call.\" or \"auth.login\"",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUCCESS",
+                "FAILURE",
+                "DENIED"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search audit logs (organization-scoped, newest first)",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign in; sets the refresh cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate the refresh cookie and get a new access token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke the refresh token family and clear the cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current user, roles and effective permissions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/atms": {
+      "get": {
+        "operationId": "AtmsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "regionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operatorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "registration",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REGISTERED",
+                "UNREGISTERED",
+                "EXPIRED",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "health",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OK",
+                "DEGRADED",
+                "FAULT",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED",
+                "MAINTENANCE"
+              ]
+            }
+          },
+          {
+            "name": "inCall",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "Only ATMs the current operator is assigned to or covers",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Search ATM ID, name, city, site",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List ATMs with live registration, assignment, call and queue status",
+        "tags": [
+          "atms"
+        ]
+      },
+      "post": {
+        "operationId": "AtmsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAtmDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an ATM; returns SIP credentials ONCE when provisionSip is true",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/regions": {
+      "get": {
+        "operationId": "AtmsController_regions",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/groups": {
+      "get": {
+        "operationId": "AtmsController_groups",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/{id}": {
+      "get": {
+        "operationId": "AtmsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "ATM detail: identity, SIP registration, assignments, call history metadata, faults, VMS link",
+        "tags": [
+          "atms"
+        ]
+      },
+      "patch": {
+        "operationId": "AtmsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAtmDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "atms"
+        ]
+      },
+      "delete": {
+        "operationId": "AtmsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Soft-delete an ATM and disable its SIP identity",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/{id}/status": {
+      "get": {
+        "operationId": "AtmsController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Compact live status",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/{id}/credentials/rotate": {
+      "post": {
+        "operationId": "AtmsController_rotate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rotate the SIP password; the new password is returned once",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/bulk": {
+      "post": {
+        "operationId": "AtmsController_bulk",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAtmDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bulk region/group/status/assignment changes (all-or-nothing)",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/atms/import": {
+      "post": {
+        "operationId": "AtmsController_import",
+        "parameters": [
+          {
+            "name": "dryRun",
+            "required": false,
+            "in": "query",
+            "description": "Validate only, write nothing",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Import/update ATMs from CSV; dryRun=true validates only",
+        "tags": [
+          "atms"
+        ]
+      }
+    },
+    "/api/v1/operators": {
+      "get": {
+        "operationId": "OperatorsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "regionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "availability",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AVAILABLE",
+                "BUSY",
+                "BREAK",
+                "OFFLINE",
+                "UNAVAILABLE",
+                "FAULT"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Search username or name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List operators with live availability, current call and assignment counts",
+        "tags": [
+          "operators"
+        ]
+      },
+      "post": {
+        "operationId": "OperatorsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperatorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an operator account (user + operator + WebRTC SIP identity)",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/me": {
+      "get": {
+        "operationId": "OperatorsController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Own operator profile",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/me/presence": {
+      "put": {
+        "operationId": "OperatorsController_setPresence",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPresenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set own availability (AVAILABLE, BREAK, UNAVAILABLE). BUSY/OFFLINE/FAULT are derived by the server.",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/me/heartbeat": {
+      "post": {
+        "operationId": "OperatorsController_heartbeat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Presence heartbeat (REST fallback; the WebSocket heartbeat is preferred)",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/me/webrtc-credentials": {
+      "post": {
+        "operationId": "OperatorsController_webrtc",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Issue session-bound SIP/WebRTC credentials and ICE servers for the operator console",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/{id}": {
+      "get": {
+        "operationId": "OperatorsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "operators"
+        ]
+      },
+      "patch": {
+        "operationId": "OperatorsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOperatorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/operators/{id}/assignments": {
+      "get": {
+        "operationId": "OperatorsController_assignments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Primary, backup and override assignments of an operator",
+        "tags": [
+          "operators"
+        ]
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "operationId": "AssignmentsController_list",
+        "parameters": [
+          {
+            "name": "atmId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operatorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Static ATM assignments (primary/backup/shift)",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{atmId}": {
+      "put": {
+        "operationId": "AssignmentsController_set",
+        "parameters": [
+          {
+            "name": "atmId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAssignmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set primary/backup operator and shift for an ATM (optimistic concurrency)",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{atmId}/resolve": {
+      "get": {
+        "operationId": "AssignmentsController_resolve",
+        "parameters": [
+          {
+            "name": "atmId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Run the routing precedence now and return the decision with its full trace",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignment-overrides": {
+      "get": {
+        "operationId": "AssignmentsController_overrides",
+        "parameters": [
+          {
+            "name": "atmId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      },
+      "post": {
+        "operationId": "AssignmentsController_createOverride",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supervisor temporary override (reason + expiry required; audited; overlapping overrides are rejected)",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignment-overrides/{id}": {
+      "delete": {
+        "operationId": "AssignmentsController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/routing-policies": {
+      "get": {
+        "operationId": "AssignmentsController_policies",
+        "parameters": [
+          {
+            "name": "atmId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operatorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "assignments"
+        ]
+      },
+      "put": {
+        "operationId": "AssignmentsController_upsertPolicy",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update the routing policy for an organization, region or group",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/shifts": {
+      "get": {
+        "operationId": "ShiftsController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "shifts"
+        ]
+      },
+      "post": {
+        "operationId": "ShiftsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "shifts"
+        ]
+      }
+    },
+    "/api/v1/shifts/on-duty": {
+      "get": {
+        "operationId": "ShiftsController_onDuty",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Operators on an active shift right now",
+        "tags": [
+          "shifts"
+        ]
+      }
+    },
+    "/api/v1/shifts/{id}": {
+      "put": {
+        "operationId": "ShiftsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "shifts"
+        ]
+      },
+      "delete": {
+        "operationId": "ShiftsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "shifts"
+        ]
+      }
+    },
+    "/api/v1/shifts/{id}/members": {
+      "put": {
+        "operationId": "ShiftsController_members",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftMembersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the operators assigned to a shift",
+        "tags": [
+          "shifts"
+        ]
+      }
+    },
+    "/api/v1/queue": {
+      "get": {
+        "operationId": "QueueController_list",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeClosed",
+            "required": false,
+            "in": "query",
+            "description": "Include requests closed in the last 24 h",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open call requests in dispatch order (with position), optionally recent closed ones",
+        "tags": [
+          "queue"
+        ]
+      },
+      "post": {
+        "operationId": "QueueController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQueueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supervisor/integration call request for an ATM; routed to an eligible operator who places the call",
+        "tags": [
+          "queue"
+        ]
+      }
+    },
+    "/api/v1/queue/{id}": {
+      "delete": {
+        "operationId": "QueueController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a request (requester or supervisor)",
+        "tags": [
+          "queue"
+        ]
+      }
+    },
+    "/api/v1/queue/{id}/decline": {
+      "post": {
+        "operationId": "QueueController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Decline a request offered to you; it is re-routed to someone else",
+        "tags": [
+          "queue"
+        ]
+      }
+    },
+    "/api/v1/calls/initiate": {
+      "post": {
+        "description": "Returns state RESERVED and a dial target + one-time token. The console then sends its INVITE; the call moves to DIALING/RINGING/CONNECTED only on SIP events. Errors: ATM_BUSY, ATM_OFFLINE, ATM_DISABLED, OPERATOR_BUSY, OPERATOR_UNAVAILABLE, NOT_AUTHORIZED, CAPACITY.",
+        "operationId": "CallsController_initiate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiateCallDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reserve a call to an ATM (authorization, availability and busy checks, atomic reservation)",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/calls/{id}/hangup": {
+      "post": {
+        "operationId": "CallsController_hangup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hang up (own call, or any call with call:hangup:any). Idempotent.",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/calls": {
+      "get": {
+        "operationId": "CallsController_active",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Active calls",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/calls/mine": {
+      "get": {
+        "operationId": "CallsController_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's own active call (console recovery after refresh)",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/calls/{id}/status": {
+      "get": {
+        "operationId": "CallsController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Call metadata and its full state timeline",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/call-history": {
+      "get": {
+        "operationId": "CallsController_history",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Super administrators only: target organization",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "atmId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operatorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "regionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "IDLE",
+                "REQUESTED",
+                "VALIDATING",
+                "RESERVED",
+                "DIALING",
+                "RINGING",
+                "CONNECTED",
+                "TERMINATING",
+                "COMPLETED",
+                "BUSY",
+                "FAILED",
+                "TIMEOUT",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Call metadata history (no audio is ever recorded)",
+        "tags": [
+          "calls"
+        ]
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "operationId": "DashboardController_summary",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Headline counts: ATMs, SIP registrations, calls, operators, faults",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/activity": {
+      "get": {
+        "operationId": "DashboardController_activity",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recent call and device events (last 24 h)",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/regions": {
+      "get": {
+        "operationId": "DashboardController_regions",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Per-region availability, faults, active calls and available operators",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/reports/calls": {
+      "get": {
+        "operationId": "DashboardController_calls",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Default: 24 h ago",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Default: now",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Calls per hour/day, per region, per operator, failure breakdown (json or csv)",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/reports/availability": {
+      "get": {
+        "operationId": "DashboardController_availability",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Default: 24 h ago",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Default: now",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Device registration/disconnect/fault trend",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/admin/roles": {
+      "get": {
+        "operationId": "AdminController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Roles and their permissions",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/organizations": {
+      "get": {
+        "operationId": "AdminController_orgs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_createOrg",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/organizations/{id}": {
+      "patch": {
+        "operationId": "AdminController_patchOrg",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgPatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "operationId": "AdminController_users",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminController_createUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{id}": {
+      "patch": {
+        "operationId": "AdminController_patchUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update user; role/password/status changes revoke the user's sessions",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/regions": {
+      "post": {
+        "operationId": "AdminController_createRegion",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeNameDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/groups": {
+      "post": {
+        "operationId": "AdminController_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeNameDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "operationId": "AdminController_settings",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/settings/{key}": {
+      "put": {
+        "operationId": "AdminController_putSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/system/live": {
+      "get": {
+        "operationId": "SystemController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Readiness probe (no details)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/health": {
+      "get": {
+        "operationId": "SystemController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Component health: database, Redis, media node, WebSocket, background jobs",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Wintek ATM SIP Command Center API",
+    "description": "Operator-initiated SIP intercom management for ATM fleets. All endpoints except auth/login, auth/refresh, auth/logout and system/live need a Bearer access token; permissions are enforced server-side. Errors use {code, message, details?, correlationId}. Real-time events: WebSocket /ws (see docs/realtime-events.md).",
+    "version": "1.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "operator1"
+          },
+          "password": {
+            "type": "string",
+            "example": "••••••••••••"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessExpiresIn": {
+            "type": "number",
+            "description": "Seconds until the access token expires"
+          },
+          "user": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessExpiresIn",
+          "user"
+        ]
+      },
+      "CreateAtmDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "Super administrators only"
+          },
+          "atmCode": {
+            "type": "string",
+            "example": "ATM-MH-00125"
+          },
+          "name": {
+            "type": "string"
+          },
+          "regionId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "deviceModel": {
+            "type": "string"
+          },
+          "serialNumber": {
+            "type": "string"
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "primaryOperatorId": {
+            "type": "string"
+          },
+          "backupOperatorId": {
+            "type": "string"
+          },
+          "vmsCameraRef": {
+            "type": "string"
+          },
+          "vmsDeepLink": {
+            "type": "string",
+            "description": "https URL; {atmCode} and {cameraRef} are substituted"
+          },
+          "provisionSip": {
+            "type": "boolean",
+            "default": true,
+            "description": "Create the SIP identity and return its password once"
+          }
+        },
+        "required": [
+          "atmCode",
+          "name",
+          "regionId"
+        ]
+      },
+      "UpdateAtmDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "regionId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "site": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "deviceModel": {
+            "type": "string"
+          },
+          "serialNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED",
+              "MAINTENANCE"
+            ]
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "vmsCameraRef": {
+            "type": "string"
+          },
+          "vmsDeepLink": {
+            "type": "string"
+          }
+        }
+      },
+      "BulkAtmDto": {
+        "type": "object",
+        "properties": {
+          "atmIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "SET_REGION",
+              "ADD_GROUP",
+              "REMOVE_GROUP",
+              "DISABLE",
+              "ENABLE",
+              "MAINTENANCE",
+              "SET_PRIMARY",
+              "SET_BACKUP"
+            ]
+          },
+          "targetId": {
+            "type": "object",
+            "description": "Region, group or operator id depending on action; null clears SET_PRIMARY/SET_BACKUP"
+          }
+        },
+        "required": [
+          "atmIds",
+          "action"
+        ]
+      },
+      "ImportBody": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "CSV with header: atm_code,name,region_code,state,city,site,address,latitude,longitude,device_model,serial_number,group_codes(;-separated),primary_username,backup_username,vms_camera_ref"
+          },
+          "provisionSip": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "csv"
+        ]
+      },
+      "SetPresenceDto": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "BREAK",
+              "UNAVAILABLE"
+            ]
+          }
+        },
+        "required": [
+          "availability"
+        ]
+      },
+      "HeartbeatDto": {
+        "type": "object",
+        "properties": {
+          "sipRegistered": {
+            "type": "boolean"
+          },
+          "mediaFault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sipRegistered"
+        ]
+      },
+      "CreateOperatorDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "Super administrators only"
+          },
+          "username": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "description": "Initial password, 12+ characters"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OPERATOR",
+              "SUPERVISOR"
+            ]
+          },
+          "employeeCode": {
+            "type": "string"
+          },
+          "routingPriority": {
+            "type": "number"
+          },
+          "regionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "username",
+          "name",
+          "password"
+        ]
+      },
+      "UpdateOperatorDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "employeeCode": {
+            "type": "string"
+          },
+          "routingPriority": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "regionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SetAssignmentDto": {
+        "type": "object",
+        "properties": {
+          "primaryOperatorId": {
+            "type": "object",
+            "nullable": true
+          },
+          "backupOperatorId": {
+            "type": "object",
+            "nullable": true
+          },
+          "shiftId": {
+            "type": "object",
+            "nullable": true
+          },
+          "expectedVersion": {
+            "type": "number",
+            "description": "Version you edited; a mismatch returns 409 STALE_VERSION"
+          }
+        }
+      },
+      "CreateOverrideDto": {
+        "type": "object",
+        "properties": {
+          "atmId": {
+            "type": "string"
+          },
+          "operatorId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "Defaults to now"
+          },
+          "endsAt": {
+            "type": "string",
+            "description": "At most 7 days after startsAt"
+          }
+        },
+        "required": [
+          "atmId",
+          "operatorId",
+          "reason",
+          "endsAt"
+        ]
+      },
+      "RoutingPolicyDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ORGANIZATION",
+              "REGION",
+              "GROUP"
+            ]
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "allowDynamic": {
+            "type": "boolean"
+          },
+          "requireActiveShift": {
+            "type": "boolean"
+          },
+          "sameRegionOnly": {
+            "type": "boolean"
+          },
+          "preferGroupMatch": {
+            "type": "boolean"
+          },
+          "allowQueueWhenBusy": {
+            "type": "boolean"
+          },
+          "queueTimeoutSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "ShiftDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "regionId": {
+            "type": "string"
+          },
+          "daysOfWeek": {
+            "description": "ISO weekdays, 1 = Monday",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "startTime": {
+            "type": "string",
+            "example": "22:00"
+          },
+          "endTime": {
+            "type": "string",
+            "example": "06:00",
+            "description": "Earlier than startTime = crosses midnight"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Kolkata"
+          }
+        },
+        "required": [
+          "name",
+          "daysOfWeek",
+          "startTime",
+          "endTime",
+          "timezone"
+        ]
+      },
+      "ShiftMembersDto": {
+        "type": "object",
+        "properties": {
+          "operatorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operatorIds"
+        ]
+      },
+      "CreateQueueDto": {
+        "type": "object",
+        "properties": {
+          "atmId": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "externalRef": {
+            "type": "string",
+            "description": "External incident id, e.g. from the VMS"
+          },
+          "preferredOperatorId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "atmId",
+          "priority"
+        ]
+      },
+      "InitiateCallDto": {
+        "type": "object",
+        "properties": {
+          "atmId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Client-generated idempotency key (UUID recommended). Retries with the same key return the same call."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "default": "P3"
+          },
+          "queueIfBusy": {
+            "type": "boolean",
+            "description": "If the ATM is busy, queue the request (when policy permits) instead of failing"
+          },
+          "queueItemId": {
+            "type": "string",
+            "description": "Queue item this call fulfils (accepting an offer)"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "atmId",
+          "requestId"
+        ]
+      },
+      "OrgDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Kolkata"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "OrgPatchDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          }
+        }
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "ORG_ADMIN",
+                "SUPERVISOR",
+                "OPERATOR",
+                "AUDITOR"
+              ]
+            }
+          }
+        },
+        "required": [
+          "username",
+          "displayName",
+          "password",
+          "roles"
+        ]
+      },
+      "UserPatchDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "LOCKED",
+              "DISABLED"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SUPER_ADMIN",
+                "ORG_ADMIN",
+                "SUPERVISOR",
+                "OPERATOR",
+                "AUDITOR"
+              ]
+            }
+          },
+          "password": {
+            "type": "string",
+            "description": "Set a new password (admin reset)"
+          }
+        }
+      },
+      "CodeNameDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "SettingDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "Omit for platform default (super admin only)"
+          },
+          "value": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+    }
+  }
+}

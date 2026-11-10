@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+// Local development convenience: load apps/api/.env if present (Node 21.7+ built-in).
+// Variables already set in the environment take precedence; tests never ship a .env.
+if (process.env.NODE_ENV !== 'test') {
+  try {
+    (process as unknown as { loadEnvFile?: (p: string) => void }).loadEnvFile?.('.env');
+  } catch {
+    /* no .env file */
+  }
+}
+
 const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
 
 const schema = z.object({
