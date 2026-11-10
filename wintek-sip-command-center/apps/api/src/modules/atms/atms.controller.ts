@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeEndpoint, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { IsIn, IsInt, IsIP, IsOptional, IsString, MaxLength } from 'class-validator';
 import type { Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
@@ -116,6 +116,10 @@ class RegistrationWebhookDto {
  * network only; the reverse proxy blocks /api/v1/internal from outside.
  */
 @ApiTags('internal')
+// One registrar node sends ~67 req/s at 20,000 devices from a single IP: the
+// per-IP user rate limit must not apply. Protected by the shared secret and
+// by network policy (reverse proxy blocks /api/v1/internal).
+@SkipThrottle()
 @Controller('internal/sip')
 export class InternalSipController {
   constructor(private readonly status: DeviceStatusService) {}

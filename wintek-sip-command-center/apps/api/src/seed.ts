@@ -33,7 +33,13 @@ const GROUPS = [
 const SITES = ['Main Road', 'Market', 'Railway Station', 'Mall', 'Bus Stand', 'Hospital', 'University', 'Airport', 'Industrial Area', 'Petrol Pump'];
 
 let seed = 42;
-const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const rnd = () => {
+  // mulberry32: exact 32-bit integer math (a naive LCG overflows JS doubles and cycles early)
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
 const pick = <T>(a: readonly T[]) => a[Math.floor(rnd() * a.length)]!;
 
 async function main() {
