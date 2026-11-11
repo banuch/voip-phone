@@ -71,6 +71,8 @@ services:
     environment:
       EXTERNAL_IP: ${EXTERNAL_IP:-127.0.0.1}
       ARI_PASSWORD: ${ARI_PASSWORD:-wintek-ari}
+      # Optional read-only ARI user "phone" for desktop softphones; empty = not created.
+      ARI_PHONE_PASSWORD: ${ARI_PHONE_PASSWORD:-}
       ASTERISK_DB_PASSWORD: ${ASTERISK_DB_PASSWORD:-asterisk}
       STUN_HOST: ${STUN_HOST:-stun.l.google.com:19302}
     volumes:
