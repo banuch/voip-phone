@@ -17,6 +17,7 @@ DEFAULTS = {
         'display_name': '', 'domain': '', 'proxy': '', 'username': '', 'auth_user': '',
         'password': '', 'expires': 300, 'register': True, 'nat': True, 'local_port': 5060,
     },
+    'directory': {'url': '', 'username': '', 'password': '', 'interval': 10},
     'codecs': ['PCMU', 'PCMA'],
     'audio': {'input': '', 'output': '', 'ringtone': '', 'mic_gain': 100, 'spk_gain': 100},
     'voice': {
@@ -29,6 +30,9 @@ DEFAULTS = {
     'history': [],
     'geometry': '',
 }
+
+# sections whose 'password' is stored DPAPI-encrypted
+SECRET_SECTIONS = ('account', 'directory')
 
 
 # -- DPAPI -----------------------------------------------------------------------
@@ -86,20 +90,22 @@ def load():
     except (OSError, ValueError):
         pass
     cfg = _merge(DEFAULTS, data)
-    acc = cfg['account']
-    acc['password'] = _decrypt(acc.pop('password_enc', '')) or acc.get('password', '')
+    for section in SECRET_SECTIONS:
+        sec = cfg[section]
+        sec['password'] = _decrypt(sec.pop('password_enc', '')) or sec.get('password', '')
     return cfg
 
 
 def save(cfg):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     out = copy.deepcopy(cfg)
-    acc = out['account']
-    password = acc.pop('password', '')
-    try:
-        acc['password_enc'] = _encrypt(password)
-    except OSError:
-        acc['password'] = password
+    for section in SECRET_SECTIONS:
+        sec = out[section]
+        password = sec.pop('password', '')
+        try:
+            sec['password_enc'] = _encrypt(password)
+        except OSError:
+            sec['password'] = password
     tmp = CONFIG_PATH + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(out, f, indent=2)
