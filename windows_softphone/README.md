@@ -4,6 +4,7 @@ A compact MicroSIP-style SIP softphone for Windows that can also **play voice fi
 
 ## Features
 
+- **Online extensions list (main screen)**: reads registered extensions from Asterisk ARI and shows them with a status dot (green = online, orange = in a call), the contact name if known, and a **Call** button on each row. It refreshes automatically every 10 s (configurable), has a Refresh button and a search box, and hides your own extension.
 - **SIP account**: registration with digest auth (MD5, qop=auth), optional outbound proxy, NAT handling (rport/received, symmetric RTP, keep-alives)
 - **Calls**: dial pad, call, answer, reject, hang up (with CANCEL), mute, hold/resume (re-INVITE), blind transfer (REFER)
 - **Direct IP calls** with no account, e.g. `192.168.1.20` or `1001@192.168.1.20:5060`
@@ -40,9 +41,16 @@ This produces `dist\WintekSoftphone.exe`, a single file with no Python needed on
 
 1. **Phone ▸ Account…**: enter the SIP server (e.g. `pbx.example.com` or `192.168.1.10`), username/extension and password.
    The dot at the top turns green when you are registered.
-2. Type a number and press **Call** (or Enter). Esc hangs up.
-3. **Voice files** tab: click **Add…** to add prompts. During a call, select a file and press **▶ Play in call**
-   (or use the quick player on the Phone tab).
+2. **Phone ▸ Directory server (ARI)…**: enter the ARI URL (e.g. `http://192.168.1.10:8088`) and an ARI
+   user/password, then use **Test connection**. On the Asterisk side:
+   - `http.conf`: `enabled = yes`, `bindaddr = 0.0.0.0` (or an address this PC can reach), `bindport = 8088`
+   - `ari.conf`: `[general] enabled = yes`, plus a user, for example `[phone]` / `type = user` / `read_only = yes` / `password = …`
+
+   The **Extensions** tab then lists every online PJSIP/SIP extension. Click **📞 Call** (or double-click a row) to call it.
+3. Or use the **Dialpad** tab: type a number and press **Call** (or Enter). Esc hangs up.
+4. While a call is active, a call bar at the top shows Hang up / Mute / Hold / Transfer and a voice-file player.
+5. **Voice files** tab: click **Add…** to add prompts. During a call, select a file and press **▶ Play in call**
+   (or use the player in the call bar).
 
 Allow the app through Windows Firewall when asked; it needs UDP 5060 for SIP and 10000–20000 for RTP.
 
@@ -65,6 +73,7 @@ The test runs two phones on localhost and checks call setup, two-way RTP, voice-
 | `softphone/g711.py` | PCMU/PCMA codec |
 | `softphone/audio.py` | Sound card I/O, mixer, file player, tones |
 | `softphone/filedecode.py` | Voice-file decoding to 8 kHz |
+| `softphone/ari.py` | Asterisk ARI client for the online extensions list |
 | `softphone/ui.py` | Tkinter UI |
 
 ## Limitations

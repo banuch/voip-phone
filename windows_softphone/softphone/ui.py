@@ -8,6 +8,7 @@ from collections import deque
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import APP_NAME, APP_VERSION, config
+from .ari import AriClient, AriError, default_url
 from .audio import (AudioEngine, FilePlayer, list_devices, make_ringback, make_ringtone,
                     play_buffer, resolve_device, stop_buffer)
 from .filedecode import FILE_TYPES, load_audio_8k
@@ -22,6 +23,41 @@ GREY = '#9a9a9a'
 ORANGE = '#f0ad4e'
 FONT = 'Segoe UI'
 DIR_ICON = {'out': '↗ Out', 'in': '↙ In', 'missed': '✗ Missed'}
+ROW_BG = '#ffffff'
+MAX_ROWS = 200
+
+
+def _natural_key(ext):
+    return (0, int(ext), '') if ext.isdigit() else (1, 0, ext.lower())
+
+
+class ScrollFrame(ttk.Frame):
+    """Vertically scrollable frame; widgets go into .inner."""
+
+    def __init__(self, parent, bg=ROW_BG):
+        super().__init__(parent)
+        self.canvas = tk.Canvas(self, highlightthickness=1, highlightbackground='#d0d0d0', bg=bg, bd=0)
+        sb = ttk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
+        self.inner = tk.Frame(self.canvas, bg=bg)
+        self._win = self.canvas.create_window((0, 0), window=self.inner, anchor='nw')
+        self.canvas.configure(yscrollcommand=sb.set)
+        self.canvas.pack(side='left', fill='both', expand=True)
+        sb.pack(side='left', fill='y')
+        self.inner.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
+        self.canvas.bind('<Configure>', lambda e: self.canvas.itemconfigure(self._win, width=e.width))
+        self.bind_all('<MouseWheel>', self._on_wheel, add='+')
+
+    def _on_wheel(self, e):
+        w = self.winfo_containing(e.x_root, e.y_root)
+        if w is None or not str(w).startswith(str(self)):
+            return
+        if self.inner.winfo_height() > self.canvas.winfo_height():
+            self.canvas.yview_scroll(int(-e.delta / 120), 'units')
+
+    def clear(self):
+        for w in self.inner.winfo_children():
+            w.destroy()
+        self.canvas.yview_moveto(0)
 
 
 def fmt_dur(sec):
@@ -37,15 +73,21 @@ class PhoneApp:
         self.cfg = config.load()
         self.root = tk.Tk()
         self.root.title(APP_NAME)
-        self.root.geometry(self.cfg.get('geometry') or '370x680')
-        self.root.minsize(350, 620)
+        self.root.geometry(self.cfg.get('geometry') or '400x720')
+        self.root.minsize(380, 640)
         self.q = queue.Queue()
         self.engine = AudioEngine()
         self._apply_audio_cfg()
         self.ua = SipUA(self)
         self.call = None
-        self.last_end_text = 'Idle'
+        self.last_end_text = ''
         self.dtmf_sent = ''
+        self.dir_entries = []
+        self.dir_error = ''
+        self.dir_updated = None
+        self.dir_sig = None
+        self.dir_wakeup = threading.Event()
+        self._closing = False
         self.tone_active = None
         self.audio_cache = {}
         self.sip_log = deque(maxlen=3000)
@@ -65,6 +107,8 @@ class PhoneApp:
         self.root.after(50, self._poll)
         self.root.after(250, self._tick)
         self._start_ua()
+        self._render_extensions()
+        threading.Thread(target=self._directory_loop, name='directory', daemon=True).start()
         if not self.cfg['account']['domain']:
             self.root.after(400, self.account_dialog)
 
@@ -86,6 +130,7 @@ class PhoneApp:
         mb = tk.Menu(self.root)
         m = tk.Menu(mb, tearoff=False)
         m.add_command(label='Account…', command=self.account_dialog)
+        m.add_command(label='Directory server (ARI)…', command=self.directory_dialog)
         m.add_command(label='Audio devices…', command=self.audio_dialog)
         m.add_separator()
         m.add_command(label='Re-register', command=self._start_ua)
@@ -108,22 +153,83 @@ class PhoneApp:
         self.reg_canvas.pack(side='left')
         self.reg_var = tk.StringVar(value='Starting…')
         ttk.Label(top, textvariable=self.reg_var, style='Status.TLabel').pack(side='left', padx=6)
+        self.info_var = tk.StringVar()
+        ttk.Label(top, textvariable=self.info_var, style='Status.TLabel', foreground='#777').pack(side='right')
+
+        self.call_frame = self._build_call_bar(self.root)   # shown only while a call is active
 
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill='both', expand=True, padx=6, pady=(0, 6))
-        phone, voice = ttk.Frame(self.nb, padding=8), ttk.Frame(self.nb, padding=8)
-        contacts, history = ttk.Frame(self.nb, padding=8), ttk.Frame(self.nb, padding=8)
-        self.nb.add(phone, text='Phone')
+        ext, dial, voice, contacts, history = (ttk.Frame(self.nb, padding=8) for _ in range(5))
+        self.nb.add(ext, text='Extensions')
+        self.nb.add(dial, text='Dialpad')
         self.nb.add(voice, text='Voice files')
         self.nb.add(contacts, text='Contacts')
         self.nb.add(history, text='History')
-        self._build_phone_tab(phone)
+        self._build_extensions_tab(ext)
+        self._build_dialpad_tab(dial)
         self._build_voice_tab(voice)
         self._build_contacts_tab(contacts)
         self._build_history_tab(history)
 
-    # -- phone tab ------------------------------------------------------------
-    def _build_phone_tab(self, f):
+    # -- call bar (always on top while in a call) ------------------------------
+    def _build_call_bar(self, parent):
+        f = ttk.LabelFrame(parent, text='Call', padding=8)
+        self.peer_var = tk.StringVar()
+        self.state_var = tk.StringVar()
+        ttk.Label(f, textvariable=self.peer_var, style='Peer.TLabel').pack(anchor='w')
+        ttk.Label(f, textvariable=self.state_var).pack(anchor='w')
+        r = ttk.Frame(f)
+        r.pack(fill='x', pady=(6, 0))
+        btn = dict(font=(FONT, 10, 'bold'), fg='white', activeforeground='white', relief='flat',
+                   cursor='hand2', padx=12)
+        self.answer_btn = tk.Button(r, text='📞 Answer', bg=GREEN, activebackground=GREEN_D,
+                                    command=self.answer, **btn)
+        self.hang_btn = tk.Button(r, text='Hang up', bg=RED, activebackground=RED_D,
+                                  command=self.on_hangup_button, **btn)
+        self.hang_btn.pack(side='left', padx=(0, 6), ipady=2)
+        self.mute_var = tk.BooleanVar()
+        self.hold_var = tk.BooleanVar()
+        self.mute_btn = ttk.Checkbutton(r, text='🎤 Mute', variable=self.mute_var, style='Toolbutton',
+                                        command=self.toggle_mute)
+        self.hold_btn = ttk.Checkbutton(r, text='⏸ Hold', variable=self.hold_var, style='Toolbutton',
+                                        command=self.toggle_hold)
+        self.xfer_btn = ttk.Button(r, text='↪ Transfer', command=self.transfer)
+        for w in (self.mute_btn, self.hold_btn, self.xfer_btn):
+            w.pack(side='left', padx=(0, 4))
+
+        self.voice_bar = ttk.Frame(f)          # shown only when connected
+        r = ttk.Frame(self.voice_bar)
+        r.pack(fill='x')
+        ttk.Label(r, text='Voice file').pack(side='left')
+        self.quick_combo = ttk.Combobox(r, state='readonly', width=18)
+        self.quick_combo.pack(side='left', fill='x', expand=True, padx=4)
+        ttk.Button(r, text='▶', width=3, command=lambda: self.play_file(self._quick_path())).pack(side='left')
+        ttk.Button(r, text='■', width=3, command=self.stop_file).pack(side='left', padx=(2, 0))
+        self.progress = ttk.Progressbar(self.voice_bar, maximum=1000)
+        self.progress.pack(fill='x', pady=(4, 0))
+        self.play_var = tk.StringVar()
+        ttk.Label(self.voice_bar, textvariable=self.play_var, style='Status.TLabel').pack(anchor='w')
+        return f
+
+    # -- extensions tab (online extensions from Asterisk ARI) -------------------
+    def _build_extensions_tab(self, f):
+        bar = ttk.Frame(f)
+        bar.pack(fill='x')
+        ttk.Label(bar, text='Search').pack(side='left')
+        self.ext_search = tk.StringVar()
+        self.ext_search.trace_add('write', lambda *_: self._render_extensions())
+        ttk.Entry(bar, textvariable=self.ext_search, font=(FONT, 10)).pack(
+            side='left', fill='x', expand=True, padx=4, ipady=2)
+        ttk.Button(bar, text='⟳ Refresh', command=self.refresh_directory).pack(side='left')
+        self.ext_status = tk.StringVar()
+        ttk.Label(f, textvariable=self.ext_status, style='Status.TLabel', foreground='#666').pack(
+            anchor='w', pady=(4, 4))
+        self.ext_list = ScrollFrame(f)
+        self.ext_list.pack(fill='both', expand=True)
+
+    # -- dialpad tab -------------------------------------------------------------
+    def _build_dialpad_tab(self, f):
         row = ttk.Frame(f)
         row.pack(fill='x')
         self.num_var = tk.StringVar()
@@ -140,47 +246,12 @@ class PhoneApp:
                           command=lambda d=d: self.press_key(d))
             b.grid(row=i // 3, column=i % 3, padx=3, pady=3)
 
-        cb = ttk.Frame(f)
-        cb.pack(fill='x', pady=(2, 6))
-        self.call_btn = tk.Button(cb, text='📞  Call', font=(FONT, 11, 'bold'), bg=GREEN, fg='white',
+        self.call_btn = tk.Button(f, text='📞  Call', font=(FONT, 11, 'bold'), bg=GREEN, fg='white',
                                   activebackground=GREEN_D, activeforeground='white', relief='flat',
                                   cursor='hand2', command=self.on_call_button)
-        self.call_btn.pack(side='left', fill='x', expand=True, padx=(0, 3), ipady=4)
-        self.hang_btn = tk.Button(cb, text='Hang up', font=(FONT, 11, 'bold'), bg=RED, fg='white',
-                                  activebackground=RED_D, activeforeground='white', relief='flat',
-                                  cursor='hand2', command=self.on_hangup_button)
-        self.hang_btn.pack(side='left', fill='x', expand=True, padx=(3, 0), ipady=4)
-
-        info = ttk.LabelFrame(f, text='Call', padding=6)
-        info.pack(fill='x')
-        self.peer_var = tk.StringVar()
-        self.state_var = tk.StringVar()
-        ttk.Label(info, textvariable=self.peer_var, style='Peer.TLabel').pack(anchor='w')
-        ttk.Label(info, textvariable=self.state_var).pack(anchor='w')
-        r = ttk.Frame(info)
-        r.pack(fill='x', pady=(4, 0))
-        self.mute_var = tk.BooleanVar()
-        self.hold_var = tk.BooleanVar()
-        self.mute_btn = ttk.Checkbutton(r, text='🎤 Mute', variable=self.mute_var, style='Toolbutton',
-                                        command=self.toggle_mute)
-        self.hold_btn = ttk.Checkbutton(r, text='⏸ Hold', variable=self.hold_var, style='Toolbutton',
-                                        command=self.toggle_hold)
-        self.xfer_btn = ttk.Button(r, text='↪ Transfer', command=self.transfer)
-        for w in (self.mute_btn, self.hold_btn, self.xfer_btn):
-            w.pack(side='left', padx=(0, 4))
-
-        vq = ttk.LabelFrame(f, text='Play voice file into call', padding=6)
-        vq.pack(fill='x', pady=(6, 0))
-        self.quick_combo = ttk.Combobox(vq, state='readonly')
-        self.quick_combo.pack(fill='x')
-        r = ttk.Frame(vq)
-        r.pack(fill='x', pady=(4, 0))
-        ttk.Button(r, text='▶ Play', command=lambda: self.play_file(self._quick_path())).pack(side='left')
-        ttk.Button(r, text='■ Stop', command=self.stop_file).pack(side='left', padx=4)
-        self.progress = ttk.Progressbar(r, maximum=1000)
-        self.progress.pack(side='left', fill='x', expand=True, padx=(4, 0))
-        self.play_var = tk.StringVar()
-        ttk.Label(vq, textvariable=self.play_var, style='Status.TLabel').pack(anchor='w')
+        self.call_btn.pack(fill='x', padx=40, pady=(2, 0), ipady=4)
+        ttk.Label(f, text='During a call the keypad sends DTMF tones.', style='Status.TLabel',
+                  foreground='#777').pack(pady=(6, 0))
 
     # -- voice tab --------------------------------------------------------------
     def _build_voice_tab(self, f):
@@ -329,6 +400,8 @@ class PhoneApp:
                         self.play_var.set('Audio device problem – see Phone ▸ SIP log')
                 elif kind == 'play_done':
                     self._on_play_done(ev[1])
+                elif kind == 'dir':
+                    self._on_directory(ev[1], ev[2])
                 elif kind == 'fn':
                     ev[1]()
         except queue.Empty:
@@ -418,7 +491,6 @@ class PhoneApp:
         self.call = call
         self.dtmf_sent = ''
         self.num_var.set(target)
-        self.nb.select(0)
         self._refresh_call_ui()
 
     def answer(self):
@@ -458,7 +530,6 @@ class PhoneApp:
             return
         self.call = call
         self.dtmf_sent = ''
-        self.nb.select(0)
         self._start_tone('ring')
         self._refresh_call_ui()
         try:
@@ -511,19 +582,26 @@ class PhoneApp:
         self.last_end_text = f'{call.end_reason}{dur}'
         self._refresh_call_ui()
 
+    @staticmethod
+    def _show(widget, visible, **pack_opts):
+        packed = widget.winfo_manager() != ''
+        if visible and not packed:
+            widget.pack(**pack_opts)
+        elif not visible and packed:
+            widget.pack_forget()
+
     def _refresh_call_ui(self):
         c = self.call
-        if c is None or c.state == 'ended':
-            self.peer_var.set('')
-            self.state_var.set(self.last_end_text)
-            self.call_btn.config(text='📞  Call', state='normal')
-            self.hang_btn.config(text='Hang up')
-            for w in (self.mute_btn, self.hold_btn, self.xfer_btn):
-                w.state(['disabled'])
+        active = c is not None and c.state != 'ended'
+        self._show(self.call_frame, active, fill='x', padx=6, pady=(0, 6), before=self.nb)
+        self.info_var.set('' if active or not self.last_end_text else f'Last call: {self.last_end_text}')
+        self.call_btn.config(state='disabled' if active else 'normal')
+        if not active:
             self.num_entry.state(['!readonly'])
             return
         peer = c.remote_number or c.dialed
-        self.peer_var.set(f'{c.remote_name}  <{peer}>' if c.remote_name and c.remote_name != peer else peer)
+        name = next((x['name'] for x in self.cfg['contacts'] if x['number'] in (peer, c.dialed)), '') or c.remote_name
+        self.peer_var.set(f'{name}  <{peer}>' if name and name != peer else peer)
         if c.state == 'connected':
             dur = fmt_dur(time.time() - (c.connected_at or time.time()))
             text = ('On hold' if c.on_hold else 'Connected') + f'  {dur}'
@@ -538,12 +616,188 @@ class PhoneApp:
                     'incoming': 'Incoming call…'}.get(c.state, c.state)
         self.state_var.set(text)
         incoming = c.state == 'incoming'
-        self.call_btn.config(text='📞  Answer' if incoming else '📞  Call',
-                             state='normal' if incoming else 'disabled')
-        self.hang_btn.config(text='Reject' if incoming else 'Hang up')
+        connected = c.state == 'connected'
+        self._show(self.answer_btn, incoming, side='left', padx=(0, 6), ipady=2, before=self.hang_btn)
+        self.hang_btn.config(text='Reject' if incoming else ('Hang up' if connected else 'Cancel'))
         for w in (self.mute_btn, self.hold_btn, self.xfer_btn):
-            w.state(['!disabled'] if c.state == 'connected' else ['disabled'])
-        self.num_entry.state(['readonly'] if c.state == 'connected' else ['!readonly'])
+            w.state(['!disabled'] if connected else ['disabled'])
+        self._show(self.voice_bar, connected, fill='x', pady=(8, 0))
+        self.num_entry.state(['readonly'] if connected else ['!readonly'])
+
+    # ======================================================================
+    # extensions directory (Asterisk ARI)
+    # ======================================================================
+    def _directory_loop(self):
+        while not self._closing:
+            d = self.cfg['directory']
+            if d.get('url'):
+                try:
+                    entries = AriClient(d['url'], d.get('username', ''), d.get('password', '')).endpoints()
+                    self.q.put(('dir', entries, None))
+                except AriError as e:
+                    self.q.put(('dir', None, str(e)))
+                except Exception as e:
+                    self.q.put(('dir', None, f'Directory error: {e}'))
+            try:
+                interval = max(3, int(d.get('interval') or 10))
+            except (TypeError, ValueError):
+                interval = 10
+            self.dir_wakeup.wait(interval)
+            self.dir_wakeup.clear()
+
+    def refresh_directory(self):
+        if self.cfg['directory'].get('url'):
+            self.ext_status.set('Refreshing…')
+        self.dir_wakeup.set()
+
+    def _on_directory(self, entries, error):
+        if entries is not None:
+            self.dir_entries = entries
+            self.dir_error = ''
+            self.dir_updated = time.strftime('%H:%M:%S')
+        else:
+            self.dir_error = error
+        self._render_extensions()
+
+    def _online_extensions(self):
+        own = (self.cfg['account'].get('username') or '').strip()
+        names = {c['number']: c['name'] for c in self.cfg['contacts']}
+        items = [dict(e, name=names.get(e['ext'], '')) for e in self.dir_entries
+                 if e['state'] == 'online' and e['ext'] != own]
+        items.sort(key=lambda e: _natural_key(e['ext']))
+        return items
+
+    def _render_extensions(self):
+        if not hasattr(self, 'ext_list'):
+            return
+        configured = bool(self.cfg['directory'].get('url'))
+        online = self._online_extensions()
+        q = self.ext_search.get().strip().lower()
+        items = [e for e in online if q in e['ext'].lower() or q in e['name'].lower()] if q else online
+
+        if not configured:
+            self.ext_status.set('Directory server not configured')
+        elif self.dir_error:
+            when = f' (last update {self.dir_updated})' if self.dir_updated else ''
+            self.ext_status.set(f'⚠ {self.dir_error}{when}')
+        elif self.dir_updated:
+            shown = f'{len(items)} of {len(online)}' if q else f'{len(online)}'
+            self.ext_status.set(f'{shown} online · updated {self.dir_updated} · '
+                                f'every {self.cfg["directory"].get("interval", 10)}s')
+        else:
+            self.ext_status.set('Loading…')
+
+        sig = (configured, bool(self.dir_error) and not self.dir_entries, q,
+               tuple((e['ext'], e['name'], e['in_call']) for e in items[:MAX_ROWS]), len(items))
+        if sig == self.dir_sig:
+            return
+        self.dir_sig = sig
+        lst = self.ext_list
+        lst.clear()
+        if not configured:
+            box = tk.Frame(lst.inner, bg=ROW_BG, pady=30)
+            box.pack(fill='x')
+            tk.Label(box, text='See which extensions are online', font=(FONT, 11, 'bold'), bg=ROW_BG).pack()
+            tk.Label(box, text='The list is read from your Asterisk server through ARI\n'
+                               '(the same server your SIP account registers to).',
+                     fg='#666', bg=ROW_BG, justify='center').pack(pady=(4, 10))
+            ttk.Button(box, text='Set up directory server…', command=self.directory_dialog).pack()
+            return
+        if not items:
+            msg = ('Cannot load extensions.' if self.dir_error and not self.dir_entries
+                   else 'No matching online extensions.' if q
+                   else 'No other extensions are online.' if self.dir_updated else 'Loading…')
+            tk.Label(lst.inner, text=msg, fg='#666', bg=ROW_BG, pady=30).pack(fill='x')
+            return
+        for e in items[:MAX_ROWS]:
+            self._ext_row(lst.inner, e)
+        if len(items) > MAX_ROWS:
+            tk.Label(lst.inner, text=f'Showing {MAX_ROWS} of {len(items)} – type to search',
+                     fg='#666', bg=ROW_BG, pady=8).pack(fill='x')
+
+    def _ext_row(self, parent, e):
+        ext = e['ext']
+        row = tk.Frame(parent, bg=ROW_BG, padx=10, pady=6)
+        row.pack(fill='x')
+        tk.Frame(parent, height=1, bg='#ececec').pack(fill='x')
+        dot = tk.Label(row, text='●', font=(FONT, 12), bg=ROW_BG, fg=ORANGE if e['in_call'] else GREEN)
+        dot.pack(side='left')
+        txt = tk.Frame(row, bg=ROW_BG)
+        txt.pack(side='left', fill='x', expand=True, padx=(8, 0))
+        title = tk.Label(txt, text=e['name'] or ext, font=(FONT, 11, 'bold'), bg=ROW_BG, anchor='w')
+        title.pack(fill='x')
+        status = 'In a call' if e['in_call'] else 'Online'
+        sub = tk.Label(txt, text=f'{ext} · {status}' if e['name'] else status, font=(FONT, 9),
+                       fg='#777', bg=ROW_BG, anchor='w')
+        sub.pack(fill='x')
+        tk.Button(row, text='📞 Call', font=(FONT, 9, 'bold'), bg=GREEN, fg='white', activebackground=GREEN_D,
+                  activeforeground='white', relief='flat', cursor='hand2', padx=12, pady=2,
+                  command=lambda: self.dial(ext)).pack(side='right')
+        for w in (row, dot, txt, title, sub):
+            w.bind('<Double-Button-1>', lambda _e: self.dial(ext))
+
+    def directory_dialog(self):
+        d = self.cfg['directory']
+        dlg = tk.Toplevel(self.root)
+        dlg.title('Directory server (Asterisk ARI)')
+        dlg.transient(self.root)
+        dlg.resizable(False, False)
+        frm = ttk.Frame(dlg, padding=14)
+        frm.pack()
+        acc = self.cfg['account']
+        server = default_url(acc.get('proxy') or acc.get('domain')).replace('http://', '').replace(':8088', '')
+        url_v = tk.StringVar(value=d.get('url') or (f'https://{server}' if server else ''))
+        user_v = tk.StringVar(value=d.get('username', ''))
+        pw_v = tk.StringVar(value=d.get('password', ''))
+        int_v = tk.StringVar(value=str(d.get('interval', 10)))
+        rows = [('ARI URL', url_v, ''), ('ARI username', user_v, ''), ('ARI password', pw_v, '•'),
+                ('Refresh every (s)', int_v, '')]
+        for r, (label, var, show) in enumerate(rows):
+            ttk.Label(frm, text=label).grid(row=r, column=0, sticky='w', pady=3, padx=(0, 10))
+            ttk.Entry(frm, textvariable=var, width=34, show=show).grid(row=r, column=1, pady=3)
+        ttk.Label(frm, text='Use the HTTPS address printed by server/setup_ari_directory.sh, '
+                            'e.g. https://pbx.example.com. A direct http://server:8088 address only '
+                            'works on a LAN where port 8088 is open.',
+                  wraplength=360, foreground='#666').grid(row=4, column=0, columnspan=2, sticky='w', pady=(8, 0))
+        result_v = tk.StringVar()
+        ttk.Label(frm, textvariable=result_v, wraplength=360).grid(row=5, column=0, columnspan=2, sticky='w',
+                                                                   pady=(6, 0))
+
+        def test():
+            result_v.set('Testing…')
+            url, user, pw = url_v.get(), user_v.get(), pw_v.get()
+
+            def run():
+                try:
+                    eps = AriClient(url, user, pw).endpoints()
+                    on = sum(1 for e in eps if e['state'] == 'online')
+                    msg = f'✔ Connected – {on} online of {len(eps)} SIP endpoints'
+                except AriError as e:
+                    msg = f'✖ {e}'
+                self.q.put(('fn', lambda: dlg.winfo_exists() and result_v.set(msg)))
+            threading.Thread(target=run, daemon=True).start()
+
+        def save():
+            try:
+                interval = max(3, int(int_v.get()))
+            except ValueError:
+                messagebox.showerror(APP_NAME, 'Refresh interval must be a number.', parent=dlg)
+                return
+            d.update(url=url_v.get().strip(), username=user_v.get().strip(), password=pw_v.get(),
+                     interval=interval)
+            self._save()
+            dlg.destroy()
+            self.dir_entries, self.dir_error, self.dir_updated, self.dir_sig = [], '', None, None
+            self._render_extensions()
+            self.refresh_directory()
+
+        b = ttk.Frame(frm)
+        b.grid(row=6, column=0, columnspan=2, sticky='e', pady=(12, 0))
+        ttk.Button(b, text='Test connection', command=test).pack(side='left', padx=(0, 12))
+        ttk.Button(b, text='Save', command=save).pack(side='left', padx=4)
+        ttk.Button(b, text='Cancel', command=dlg.destroy).pack(side='left')
+        dlg.bind('<Escape>', lambda e: dlg.destroy())
+        dlg.grab_set()
 
     # -- tones -------------------------------------------------------------------
     def _start_tone(self, kind):
@@ -755,6 +1009,7 @@ class PhoneApp:
         self.contact_tree.delete(*self.contact_tree.get_children())
         for i, c in sorted(enumerate(self.cfg['contacts']), key=lambda ic: ic[1]['name'].lower()):
             self.contact_tree.insert('', 'end', iid=str(i), values=(c['name'], c['number']))
+        self._render_extensions()   # contact names label extensions
 
     def _contact_form(self, title, name='', number=''):
         dlg = tk.Toplevel(self.root)
@@ -917,6 +1172,7 @@ class PhoneApp:
             self._save()
             dlg.destroy()
             self._start_ua()
+            self._render_extensions()
 
         b = ttk.Frame(frm)
         b.grid(row=r + 4, column=0, columnspan=2, sticky='e', pady=(12, 0))
@@ -1033,6 +1289,8 @@ class PhoneApp:
             self._append_log(f'Cannot save settings: {e}')
 
     def on_close(self):
+        self._closing = True
+        self.dir_wakeup.set()
         try:
             self.cfg['geometry'] = self.root.geometry()
         except tk.TclError:
