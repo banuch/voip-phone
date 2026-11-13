@@ -1,4 +1,4 @@
-# Development / single-server stack. From wintek-sip-command-center/:
+# Development / single-server stack. From command-center/:
 #   docker compose -f infra/docker-compose.yml up -d postgres redis      # data services only (dev)
 #   docker compose -f infra/docker-compose.yml --profile full up -d      # + API, dashboard, Asterisk, TURN
 #   docker compose -f infra/docker-compose.yml --profile stage2 up -d    # + Kamailio registrar

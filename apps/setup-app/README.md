@@ -1,6 +1,6 @@
 # SIP Phone Setup (Flutter)
 
-Android / iOS app that configures the `ESP32S3_SipPhone` over Bluetooth LE. It speaks the same GATT protocol as `ESP32S3_SipPhone/provision.html`, so the phone firmware needs no changes.
+Android / iOS app that configures the `firmware/ESP32S3_SipPhone` over Bluetooth LE. It speaks the same GATT protocol as `firmware/ESP32S3_SipPhone/provision.html`, so the phone firmware needs no changes.
 
 ## Features
 

@@ -1,4 +1,9 @@
-.build/
-release/
-ESP32S3_SipPhone/config.h
-ESP32S3_SipPhone/build/
+# Firmware build outputs (firmware/build.bat, firmware/ESP32S3_SipPhone/build.bat)
+firmware/.build/
+firmware/release/
+firmware/*/build/
+
+# Local device secrets
+firmware/ESP32S3_SipPhone/config.h
+
+__pycache__/

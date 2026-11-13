@@ -6,11 +6,11 @@ Per-component detail lives in:
 
 | File | Covers |
 | --- | --- |
-| [ESP32S3_SipPhone/README.md](../ESP32S3_SipPhone/README.md) | Phone firmware: settings, BLE protocol, controls, troubleshooting |
-| [sipphone_setup_app/README.md](../sipphone_setup_app/README.md) | Flutter setup app |
-| [ESP32S3_AudioWebTest/README.md](../ESP32S3_AudioWebTest/README.md) | Mic/speaker bench test sketch |
-| [ESP32_CIRCUIT_NOTES.md](../ESP32_CIRCUIT_NOTES.md) | Circuit intent and known errors in the original drawing |
-| [BUILD.md](../BUILD.md) | `build.bat` options |
+| [firmware/ESP32S3_SipPhone/README.md](../firmware/ESP32S3_SipPhone/README.md) | Phone firmware: settings, BLE protocol, controls, troubleshooting |
+| [apps/setup-app/README.md](../apps/setup-app/README.md) | Flutter setup app |
+| [firmware/ESP32S3_AudioWebTest/README.md](../firmware/ESP32S3_AudioWebTest/README.md) | Mic/speaker bench test sketch |
+| [circuit-notes.md](circuit-notes.md) | Circuit intent and known errors in the original drawing |
+| [firmware-build.md](firmware-build.md) | `firmware/build.bat` options |
 
 ---
 
@@ -89,7 +89,7 @@ arduino-cli core install esp32:esp32@3.3.12
 | Regulated 5 V | MAX98357A VIN | Amp supply |
 | GPIO0 (BOOT button) | on-board | Answer / hang up |
 
-Keep the 3.3 V and 5 V rails separate. The original circuit drawing has rail and ground mistakes; follow this table and [ESP32_CIRCUIT_NOTES.md](../ESP32_CIRCUIT_NOTES.md). Set the amplifier's SD/EN and GAIN pins according to your breakout's schematic.
+Keep the 3.3 V and 5 V rails separate. The original circuit drawing has rail and ground mistakes; follow this table and [circuit-notes.md](circuit-notes.md). Set the amplifier's SD/EN and GAIN pins according to your breakout's schematic.
 
 Pins are build-time only. To change them, edit `config.h` (see §6.3).
 
@@ -256,32 +256,32 @@ Register the operator softphone as `1002` (server = Asterisk IP, port 5060, UDP,
 
 ## 5. Firmware: build and flash
 
-All commands run from the repository root in PowerShell. `build.bat` builds `ESP32S3_AudioWebTest` by default; set `AUDIO_SKETCH` to build the phone.
+All commands run from the repository root in PowerShell. `firmware\build.bat` builds `ESP32S3_AudioWebTest` by default; set `AUDIO_SKETCH` to build the phone.
 
 ### 5.1 Bench-test the audio first (recommended)
 
 `ESP32S3_AudioWebTest` checks the mic and speaker in a browser before SIP is involved. Set `WIFI_SSID` / `WIFI_PASSWORD` at the top of its `.ino`, then:
 
 ```powershell
-.\build.bat COM5
+.\firmware\build.bat COM5
 ```
 
-Open the IP printed on the serial monitor, play the bundled `test-tone-16k-mono.wav` and record the mic. This sketch requires PSRAM. See its [README](../ESP32S3_AudioWebTest/README.md).
+Open the IP printed on the serial monitor, play the bundled `test-tone-16k-mono.wav` and record the mic. This sketch requires PSRAM. See its [README](../firmware/ESP32S3_AudioWebTest/README.md).
 
 ### 5.2 Build and flash the SIP phone
 
 ```powershell
 $env:AUDIO_SKETCH='ESP32S3_SipPhone'
-.\build.bat COM5
+.\firmware\build.bat COM5
 ```
 
 | Command | Does |
 | --- | --- |
-| `.\build.bat compile` | Compile only, no board needed |
-| `.\build.bat COM5 upload` | Compile and upload |
-| `.\build.bat COM5 monitor` | Serial monitor only (115200 baud) |
-| `.\build.bat COM5` | Compile, upload, monitor |
-| `.\build.bat` | Same, auto-detecting the port if only one ESP32 is connected |
+| `.\firmware\build.bat compile` | Compile only, no board needed |
+| `.\firmware\build.bat COM5 upload` | Compile and upload |
+| `.\firmware\build.bat COM5 monitor` | Serial monitor only (115200 baud) |
+| `.\firmware\build.bat COM5` | Compile, upload, monitor |
+| `.\firmware\build.bat` | Same, auto-detecting the port if only one ESP32 is connected |
 
 For the SIP phone the script automatically uses the **Minimal SPIFFS (1.9 MB app with OTA)** partition scheme, because Wi-Fi plus Bluetooth does not fit the default 1.2 MB app slot. Default board options are native USB CDC, QIO, 16 MB flash, OPI PSRAM. Override them for your module:
 
@@ -289,13 +289,13 @@ For the SIP phone the script automatically uses the **Minimal SPIFFS (1.9 MB app
 $env:AUDIO_FQBN='esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,FlashSize=4M,PartitionScheme=min_spiffs,PSRAM=disabled'
 ```
 
-Firmware images go to `release\`, build intermediates to `.build\`. If the upload fails, hold BOOT, tap RESET, release BOOT, and retry. If the COM number changes after upload, rerun `monitor` with the new port.
+Firmware images go to `firmware\release\`, build intermediates to `firmware\.build\`. If the upload fails, hold BOOT, tap RESET, release BOOT, and retry. If the COM number changes after upload, rerun `monitor` with the new port.
 
 ### 5.3 Later updates over Wi-Fi
 
-Once the phone is on Wi-Fi, later firmware can go over the network instead of USB: set an **Update password** in the setup app, build with `.\build.bat compile`, open `http://<phone-ip>/update` (user `admin`) and upload `release\ESP32S3_SipPhone.ino.bin`. The phone writes it to its second firmware slot, restarts, and keeps it only if Wi-Fi is up for 30 s after the restart; otherwise it rolls back to the previous firmware. Bump `FW_VERSION` in `ESP32S3_SipPhone/version.h` for each release so the app and `s` show which version is running. Details: [ESP32S3_SipPhone/README.md](../ESP32S3_SipPhone/README.md#update-firmware-over-wi-fi).
+Once the phone is on Wi-Fi, later firmware can go over the network instead of USB: set an **Update password** in the setup app, build with `.\firmware\build.bat compile`, open `http://<phone-ip>/update` (user `admin`) and upload `firmware\release\ESP32S3_SipPhone.ino.bin`. The phone writes it to its second firmware slot, restarts, and keeps it only if Wi-Fi is up for 30 s after the restart; otherwise it rolls back to the previous firmware. Bump `FW_VERSION` in `firmware/ESP32S3_SipPhone/version.h` for each release so the app and `s` show which version is running. Details: [ESP32S3_SipPhone/README.md](../firmware/ESP32S3_SipPhone/README.md#update-firmware-over-wi-fi).
 
-Arduino IDE alternative: board *ESP32S3 Dev Module*, core 3.3.12, Tools → Partition Scheme → *Minimal SPIFFS*, USB CDC On Boot enabled, open `ESP32S3_SipPhone/ESP32S3_SipPhone.ino`, upload.
+Arduino IDE alternative: board *ESP32S3 Dev Module*, core 3.3.12, Tools → Partition Scheme → *Minimal SPIFFS*, USB CDC On Boot enabled, open `firmware/ESP32S3_SipPhone/ESP32S3_SipPhone.ino`, upload.
 
 ---
 
@@ -343,7 +343,7 @@ The phone counts as **configured** once Wi-Fi SSID, SIP server and SIP user are 
 To ship a phone that works without Bluetooth setup, copy the template and fill it in:
 
 ```powershell
-Copy-Item ESP32S3_SipPhone\config.example.h ESP32S3_SipPhone\config.h
+Copy-Item firmware\ESP32S3_SipPhone\config.example.h firmware\ESP32S3_SipPhone\config.h
 ```
 
 `config.h` is git-ignored, so credentials stay out of the repository. It is also the only place to change the I2S pins (`I2S_BCLK_PIN`, `I2S_WS_PIN`, `I2S_MIC_PIN`, `I2S_SPEAKER_PIN`) and the answer button (`ANSWER_BUTTON_PIN`). Settings saved later over Bluetooth still take precedence.
@@ -422,7 +422,7 @@ SIP 1001@192.168.1.50:5060, auto-answer 1000 ms
 ### 8.1 Flutter app (Android / iOS)
 
 ```bash
-cd sipphone_setup_app
+cd apps\setup-app
 ```
 
 ```bash
@@ -462,10 +462,10 @@ flutter test
 
 ### 8.2 Browser alternative: `provision.html`
 
-No build needed. Open `ESP32S3_SipPhone/provision.html` in **Chrome or Edge** (Windows, macOS, Linux, Android), or serve it locally:
+No build needed. Open `firmware/ESP32S3_SipPhone/provision.html` in **Chrome or Edge** (Windows, macOS, Linux, Android), or serve it locally:
 
 ```bash
-python -m http.server --directory ESP32S3_SipPhone 8000
+python -m http.server --directory firmware/ESP32S3_SipPhone 8000
 ```
 
 Then open `http://localhost:8000/provision.html`. On iPhone use the Bluefy browser; Safari and Firefox lack Web Bluetooth.
@@ -492,7 +492,7 @@ Pairing is "Just Works" with LE Secure Connections: the link is encrypted but th
 2. **Bench test** audio with `ESP32S3_AudioWebTest` (§5.1).
 3. **Install and start Asterisk**, configure 1001 and 1002 (§4). Note the server IP and the 1001 password.
 4. **Register the operator softphone** as 1002 and confirm with `pjsip show contacts`.
-5. **Flash the phone**: `$env:AUDIO_SKETCH='ESP32S3_SipPhone'; .\build.bat COM5` (§5.2). The serial monitor shows `Not configured` and `[BLE] advertising as "SipPhone-XXXX"`.
+5. **Flash the phone**: `$env:AUDIO_SKETCH='ESP32S3_SipPhone'; .\firmware\build.bat COM5` (§5.2). The serial monitor shows `Not configured` and `[BLE] advertising as "SipPhone-XXXX"`.
 6. **Open the setup app** (or `provision.html`), scan, tap `SipPhone-XXXX`, accept pairing.
 7. **Enter settings**: Wi-Fi SSID and password, SIP server = Asterisk IP, port 5060, extension 1001, the 1001 password. Leave the rest at defaults. Tap **Save and restart**.
 8. **Wait for the reconnect**. Status should show Wi-Fi *connected* with an IP and SIP *registered*. On Asterisk, `pjsip show contacts` lists 1001.

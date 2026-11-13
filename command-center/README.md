@@ -1,7 +1,7 @@
 # Wintek ATM SIP Command Center V1.1
 
 Enterprise platform for monitoring, managing and talking to up to 20,000 ATM
-SIP intercoms (the ESP32-S3 device in `../ESP32S3_SipPhone`). Security
+SIP intercoms (the ESP32-S3 device in `../firmware/ESP32S3_SipPhone`). Security
 operators watch their CCTV/VMS as usual; when they see something they click
 **CALL**, the platform validates and reserves the call, the intercom answers
 automatically, and the operator speaks to the person at the ATM.
@@ -15,7 +15,7 @@ automatically, and the operator speaks to the person at the ATM.
 ## Repository layout
 
 ```
-wintek-sip-command-center/
+command-center/
   packages/shared/      Domain rules shared by API and UI (pure, unit-tested):
                         call state machine + timeouts, hybrid assignment resolver,
                         priority queue ordering, presence derivation, RBAC, event envelope

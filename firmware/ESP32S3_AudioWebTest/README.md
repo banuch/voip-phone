@@ -16,7 +16,7 @@ Arduino sketch for INMP441 capture and MAX98357A playback, controlled from a bro
 
 Speaker connects across SPK+ and SPK-. Neither speaker lead connects to GND. Configure amplifier SD/EN and GAIN according to your breakout's schematic. The sketch does not drive an enable pin. Verify the GPIO header labels against your actual board.
 
-Keep microphone 3.3 V and amplifier 5 V separate. The earlier illustration has incorrect rail/ground connections; follow this table and `ESP32_CIRCUIT_NOTES.md`. Avoid backfeeding USB through an external board supply. Use a suitable amplifier supply with local decoupling and common ground.
+Keep microphone 3.3 V and amplifier 5 V separate. The earlier illustration has incorrect rail/ground connections; follow this table and [`docs/circuit-notes.md`](../../docs/circuit-notes.md). Avoid backfeeding USB through an external board supply. Use a suitable amplifier supply with local decoupling and common ground.
 
 ## Arduino IDE setup
 

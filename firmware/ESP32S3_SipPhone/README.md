@@ -1,6 +1,6 @@
 # ESP32-S3 SIP phone
 
-Registers to a SIP server (tested target: Asterisk on the same LAN) and answers incoming calls with two-way G.711 audio through the INMP441 microphone and MAX98357A speaker. All Wi-Fi, SIP and audio settings are set over **Bluetooth LE** from the Flutter app (`sipphone_setup_app`) or a browser page and stored in flash. Bluetooth is always on, so settings can be changed at any time. Arduino-ESP32 **3.3.12**, no external libraries, no PSRAM required.
+Registers to a SIP server (tested target: Asterisk on the same LAN) and answers incoming calls with two-way G.711 audio through the INMP441 microphone and MAX98357A speaker. All Wi-Fi, SIP and audio settings are set over **Bluetooth LE** from the Flutter app (`apps/setup-app`) or a browser page and stored in flash. Bluetooth is always on, so settings can be changed at any time. Arduino-ESP32 **3.3.12**, no external libraries, no PSRAM required.
 
 Wiring is identical to `ESP32S3_AudioWebTest` (GPIO4 BCLK, GPIO5 WS, GPIO6 mic SD, GPIO7 amp DIN). Verify the mic and speaker with that bench sketch first.
 
@@ -9,9 +9,9 @@ Wiring is identical to `ESP32S3_AudioWebTest` (GPIO4 BCLK, GPIO5 WS, GPIO6 mic S
 **Over the UART serial port** (the board's USB-to-serial chip, CH340 / CP210x, connector usually marked *UART* or *COM*), use the sketch's own script:
 
 ```powershell
-.\ESP32S3_SipPhone\build.bat COM9            # compile, upload, monitor
-.\ESP32S3_SipPhone\build.bat compile         # compile only
-.\ESP32S3_SipPhone\build.bat COM9 monitor    # Serial Monitor only
+.\firmware\ESP32S3_SipPhone\build.bat COM9            # compile, upload, monitor
+.\firmware\ESP32S3_SipPhone\build.bat compile         # compile only
+.\firmware\ESP32S3_SipPhone\build.bat COM9 monitor    # Serial Monitor only
 ```
 
 Without a port it picks the only USB-to-serial port that isn't the ESP32-S3's native USB. It builds with *USB CDC On Boot: Disabled*, so `Serial` goes to UART0 (GPIO43/44) and the log appears on that port. It uploads at 921600 baud; set `$env:SIP_UPLOAD_SPEED='115200'` if uploads fail. Set `$env:SIP_FQBN` to override the board options, for example for a 4 MB module without PSRAM (see the comments in the script).
@@ -20,7 +20,7 @@ Without a port it picks the only USB-to-serial port that isn't the ESP32-S3's na
 
 ```powershell
 $env:AUDIO_SKETCH='ESP32S3_SipPhone'
-.\build.bat COM5
+.\firmware\build.bat COM5
 ```
 
 Both scripts select the **Minimal SPIFFS (1.9 MB APP with OTA)** partition scheme for this sketch, because Wi-Fi plus Bluetooth needs more than the default 1.2 MB app slot leaves spare. In the Arduino IDE choose Tools > Partition Scheme > *Minimal SPIFFS*. Any module with at least 4 MB flash works.
@@ -67,9 +67,9 @@ To write settings with a generic BLE app such as nRF Connect: write `begin` to C
 After the first USB flash, new firmware can be uploaded from a browser on the same network. The phone keeps two 1.9 MB firmware slots (the Minimal SPIFFS partition scheme): the upload is written to the unused slot, and the phone switches to it after a restart.
 
 1. **Turn updates on**: in the setup app (or `provision.html`) enter an **Update password** (8-64 characters) under *Firmware update over Wi-Fi* and save. Without one, updates are off.
-2. **Build** the new firmware. Bump `FW_VERSION` in [`version.h`](version.h) so you can see the change, then run `.\build.bat compile` with `$env:AUDIO_SKETCH='ESP32S3_SipPhone'`.
+2. **Build** the new firmware. Bump `FW_VERSION` in [`version.h`](version.h) so you can see the change, then run `.\firmware\build.bat compile` with `$env:AUDIO_SKETCH='ESP32S3_SipPhone'`.
 3. **Open** `http://<phone-ip>/update` (the app's status shows the link). Log in as user `admin` with the update password.
-4. **Choose** `release\ESP32S3_SipPhone.ino.bin` (not the `merged` or `bootloader` file) and click **Upload**. It takes about 15-30 s; the phone restarts and the page goes back to the status page, which shows the new version.
+4. **Choose** `firmware\release\ESP32S3_SipPhone.ino.bin` (not the `merged` or `bootloader` file) and click **Upload**. It takes about 15-30 s; the phone restarts and the page goes back to the status page, which shows the new version.
 
 Uploads are refused during a call. Files that are not ESP32 firmware images are rejected before anything is switched.
 
@@ -122,7 +122,7 @@ The speaker says **"Wi-Fi connected"** when Wi-Fi joins and **"SIP phone connect
 The sounds are built into the firmware. Each one is a 16-bit PCM array in `prompts.h`, about 93 KB together. A firmware update over Wi-Fi updates them too, and no filesystem is needed. To change them:
 
 1. Replace `prompts/wifi_connected.wav` or `prompts/sip_connected.wav` with your own recording: **16 kHz, mono, 16-bit PCM WAV**, up to 4 seconds. Or delete a WAV to have Windows text-to-speech speak it again.
-2. From the repository root run `python tools/make_prompts.py`. Add `--tts` to re-speak both with text-to-speech. The script trims the silence at each end and rewrites `prompts.h`.
+2. From the repository root run `python firmware/tools/make_prompts.py`. Add `--tts` to re-speak both with text-to-speech. The script trims the silence at each end and rewrites `prompts.h`.
 3. Rebuild and flash.
 
 ## How it works

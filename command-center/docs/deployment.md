@@ -3,7 +3,7 @@
 ## Development (no SIP hardware needed)
 
 ```bash
-cd wintek-sip-command-center
+cd command-center
 pnpm install
 docker compose -f infra/docker-compose.yml up -d postgres redis
 cp apps/api/.env.example apps/api/.env      # SIP_DRIVER=simulated

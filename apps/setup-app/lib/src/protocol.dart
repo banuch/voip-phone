@@ -1,4 +1,4 @@
-// GATT protocol of the ESP32-S3 SIP phone (see ESP32S3_SipPhone/ble_prov.h).
+// GATT protocol of the ESP32-S3 SIP phone (see firmware/ESP32S3_SipPhone/ble_prov.h).
 //
 // Service  6b3f0001-...  Config (read/write, encrypted), Command (write, encrypted),
 // Status (read/notify). To save: write "begin" to Command, the settings JSON to

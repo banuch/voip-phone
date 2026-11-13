@@ -10,7 +10,7 @@
 // password is set over Bluetooth (see ota.h).
 //
 // Voice prompts "Wi-Fi connected" and "SIP phone connected successfully" are
-// built into the firmware; tools/make_prompts.py regenerates prompts.h.
+// built into the firmware; firmware/tools/make_prompts.py regenerates prompts.h.
 //
 // BOOT button: press = answer when ringing, otherwise hang up.
 // Serial commands (115200 baud):

@@ -35,7 +35,7 @@ const char UPDATE_PAGE[] PROGMEM = R"HTML(<!doctype html>
 progress{width:100%;height:1.2rem}button{font-size:1rem;padding:.5rem 1rem}#msg{margin-top:1rem}</style>
 </head><body>
 <h1>Firmware update</h1>
-<p>Running <b>%FW%</b>. Choose <code>release/ESP32S3_SipPhone.ino.bin</code>.</p>
+<p>Running <b>%FW%</b>. Choose <code>firmware/release/ESP32S3_SipPhone.ino.bin</code>.</p>
 <form id="f"><input type="file" id="file" accept=".bin" required> <button>Upload</button></form>
 <p><progress id="bar" max="100" value="0"></progress></p>
 <div id="msg"></div>
